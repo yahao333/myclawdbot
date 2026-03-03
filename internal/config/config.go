@@ -86,7 +86,7 @@ func LoadFromEnv() *Config {
 			APIKey:   getEnv("MINIMAX_API_KEY", ""),
 			Model:    model,
 			BaseURL:  getEnv("LLM_BASE_URL", "https://api.minimaxi.com/anthropic"),
-			GroupID:  getEnv("MINIMAX_GROUP_ID", "group_default"),
+			GroupID:  getEnv("MINIMAX_GROUP_ID", ""),
 		},
 		Tools: ToolsConfig{
 			AllowedCommands: []string{"go", "git", "ls", "cat", "pwd", "echo", "mkdir", "rm", "cp", "mv"},
