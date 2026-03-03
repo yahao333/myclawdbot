@@ -115,7 +115,9 @@ func (c *AnthropicClient) StreamChat(ctx context.Context, req *ChatRequest) (<-c
 	httpReq.Header.Set("anthropic-version", anthropicVersion)
 	httpReq.Header.Set("Accept", "text/event-stream")
 
+	fmt.Println("anthropic do...")
 	resp, err := c.httpClient.Do(httpReq)
+	fmt.Println("anthropic resp:", resp)
 	if err != nil {
 		return nil, fmt.Errorf("failed to send request: %w", err)
 	}
