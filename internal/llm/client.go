@@ -43,27 +43,17 @@ type ChatResponse struct {
 }
 
 // NewClient 创建 LLM 客户端
-// groupID 是 Minimax 所需的 GroupId 参数
-func NewClient(provider, apiKey, model, baseURL, groupID string) (Client, error) {
+func NewClient(provider, apiKey, model, baseURL, _ string) (Client, error) {
 	switch provider {
 	case "anthropic":
 		return NewAnthropicClient(apiKey, model, baseURL)
 	case "openai":
 		return NewOpenAIClient(apiKey, model, baseURL)
 	case "minimax":
-		if groupID == "" {
-			if baseURL == "" {
-				baseURL = "https://api.minimaxi.com/anthropic"
-			}
-			return NewAnthropicClient(apiKey, model, baseURL)
+		if baseURL == "" {
+			baseURL = "https://api.minimaxi.com/anthropic"
 		}
-
-		client, err := NewMinimaxClient(apiKey, model, baseURL)
-		if err != nil {
-			return nil, err
-		}
-		client.SetGroupID(groupID)
-		return client, nil
+		return NewAnthropicClient(apiKey, model, baseURL)
 	default:
 		return NewAnthropicClient(apiKey, model, baseURL)
 	}

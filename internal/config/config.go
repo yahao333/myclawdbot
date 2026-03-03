@@ -22,7 +22,7 @@ type LLMConfig struct {
 	APIKey   string `yaml:"api_key"`
 	Model    string `yaml:"model"`
 	BaseURL  string `yaml:"base_url"` // 可选，自定义 API 端点
-	GroupID  string `yaml:"group_id"` // Minimax 所需
+	GroupID  string `yaml:"group_id"` // 兼容历史配置，当前 Minimax Anthropic 兼容模式不使用
 }
 
 // ChannelConfig 渠道配置
