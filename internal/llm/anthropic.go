@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"os"
 	"strings"
 	"time"
 
@@ -115,17 +116,29 @@ func (c *AnthropicClient) StreamChat(ctx context.Context, req *ChatRequest) (<-c
 	httpReq.Header.Set("anthropic-version", anthropicVersion)
 	httpReq.Header.Set("Accept", "text/event-stream")
 
-	fmt.Printf("[anthropic-stream] request start url=%s model=%s\n", url, c.model)
+	debug := streamDebugEnabled()
+	logf := func(format string, args ...any) {
+		if debug {
+			fmt.Printf(format, args...)
+		}
+	}
+	logln := func(args ...any) {
+		if debug {
+			fmt.Println(args...)
+		}
+	}
+
+	logf("[anthropic-stream] request start url=%s model=%s\n", url, c.model)
 	resp, err := c.httpClient.Do(httpReq)
 	if err != nil {
-		fmt.Printf("[anthropic-stream] request error: %v\n", err)
+		logf("[anthropic-stream] request error: %v\n", err)
 		return nil, fmt.Errorf("failed to send request: %w", err)
 	}
-	fmt.Printf("[anthropic-stream] response status=%s content-type=%s\n", resp.Status, resp.Header.Get("Content-Type"))
+	logf("[anthropic-stream] response status=%s content-type=%s\n", resp.Status, resp.Header.Get("Content-Type"))
 
 	if resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(resp.Body)
-		fmt.Printf("[anthropic-stream] non-200 body=%s\n", string(body))
+		logf("[anthropic-stream] non-200 body=%s\n", string(body))
 		return nil, fmt.Errorf("api error: %s", string(body))
 	}
 
@@ -149,10 +162,10 @@ func (c *AnthropicClient) StreamChat(ctx context.Context, req *ChatRequest) (<-c
 			dataLines = dataLines[:0]
 			data = strings.TrimSpace(data)
 			if data == "" || data == "[DONE]" {
-				fmt.Println("[anthropic-stream] skip empty or done event payload")
+				logln("[anthropic-stream] skip empty or done event payload")
 				return true
 			}
-			fmt.Printf("[anthropic-stream] event payload bytes=%d\n", len(data))
+			logf("[anthropic-stream] event payload bytes=%d\n", len(data))
 
 			var event struct {
 				Type  string `json:"type"`
@@ -162,22 +175,22 @@ func (c *AnthropicClient) StreamChat(ctx context.Context, req *ChatRequest) (<-c
 				} `json:"delta"`
 			}
 			if err := json.Unmarshal([]byte(data), &event); err != nil {
-				fmt.Printf("[anthropic-stream] unmarshal event failed: %v payload=%s\n", err, data)
+				logf("[anthropic-stream] unmarshal event failed: %v payload=%s\n", err, data)
 				return true
 			}
-			fmt.Printf("[anthropic-stream] event type=%s delta_type=%s\n", event.Type, event.Delta.Type)
+			logf("[anthropic-stream] event type=%s delta_type=%s\n", event.Type, event.Delta.Type)
 
 			switch event.Type {
 			case "content_block_delta":
 				if event.Delta.Type == "text_delta" {
 					currentContent += event.Delta.Text
-					fmt.Printf("[anthropic-stream] emit text_delta bytes=%d total_bytes=%d\n", len(event.Delta.Text), len(currentContent))
+					logf("[anthropic-stream] emit text_delta bytes=%d total_bytes=%d\n", len(event.Delta.Text), len(currentContent))
 					ch <- &ChatResponse{Content: currentContent}
 				}
 			case "content_block_stop":
-				fmt.Println("[anthropic-stream] content block finished, wait next block")
+				logln("[anthropic-stream] content block finished, wait next block")
 			case "message_stop":
-				fmt.Println("[anthropic-stream] message stop received")
+				logln("[anthropic-stream] message stop received")
 				return false
 			}
 
@@ -187,7 +200,7 @@ func (c *AnthropicClient) StreamChat(ctx context.Context, req *ChatRequest) (<-c
 		for scanner.Scan() {
 			select {
 			case <-ctx.Done():
-				fmt.Println("[anthropic-stream] context canceled")
+				logln("[anthropic-stream] context canceled")
 				return
 			default:
 			}
@@ -211,16 +224,25 @@ func (c *AnthropicClient) StreamChat(ctx context.Context, req *ChatRequest) (<-c
 			dataLines = append(dataLines, data)
 		}
 		if err := scanner.Err(); err != nil {
-			fmt.Printf("[anthropic-stream] scanner error: %v\n", err)
+			logf("[anthropic-stream] scanner error: %v\n", err)
 		}
 
 		if len(dataLines) > 0 {
 			flushEvent()
 		}
-		fmt.Println("[anthropic-stream] stream loop finished")
+		logln("[anthropic-stream] stream loop finished")
 	}()
 
 	return ch, nil
+}
+
+func streamDebugEnabled() bool {
+	switch strings.ToLower(strings.TrimSpace(os.Getenv("LLM_DEBUG_STREAM"))) {
+	case "1", "true", "on", "yes":
+		return true
+	default:
+		return false
+	}
 }
 
 // Tools 获取可用工具
