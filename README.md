@@ -1,10 +1,10 @@
 # MyClawDBot
 
-使用 Go 语言复刻 [OpenClaw](https://github.com/openclaw/openclaw) 核心功能的 AI 编程助手。
+一个强大的 AI 编程助手，帮助你完成软件开发任务。
 
 ## 项目简介
 
-MyClawDBot 是一个 AI 编程助手，能够帮助你完成软件开发任务。它可以：
+MyClawDBot 是一个 AI 编程助手，能够通过自然语言帮助你完成各种软件开发任务。它可以：
 - 读写文件、搜索代码
 - 执行命令、运行测试
 - 分析和理解代码库
@@ -60,13 +60,29 @@ go run ./cmd/myclawdbot
 .
 ├── cmd/           # 命令行入口
 ├── internal/      # 内部包
-├── pkg/           # 可复用包
-├── api/           # API 接口
-└── docs/          # 文档
+│   ├── channel/   # 消息渠道
+│   ├── config/    # 配置管理
+│   ├── llm/       # LLM 客户端
+│   ├── session/   # 会话管理
+│   └── tools/     # 工具集
+│       ├── exec/  # 命令执行
+│       ├── file/ # 文件操作
+│       └── web/  # 网络请求
+└── pkg/           # 公共包
 ```
+
+## 配置
+
+可通过环境变量配置：
+
+| 变量 | 说明 |
+|-----|------|
+| `ANTHROPIC_API_KEY` | Anthropic API 密钥 |
+| `OPENAI_API_KEY` | OpenAI API 密钥 |
+| `MINIMAX_API_KEY` | MiniMax API 密钥 |
+| `SESSION_STORAGE_DIR` | 会话存储目录 |
 
 ## 参考
 
-- 原始项目: [OpenClaw](https://github.com/openclaw/openclaw)
 - 官方网站: https://openclaw.ai
 - 文档: https://docs.openclaw.ai
