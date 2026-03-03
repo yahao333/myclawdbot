@@ -23,23 +23,23 @@ type Client interface {
 
 // ChatRequest 聊天请求
 type ChatRequest struct {
-	Model       string
-	Messages    []types.Message
+	Model        string
+	Messages     []types.Message
 	SystemPrompt string
-	MaxTokens   int
-	Temperature float64
-	Tools       []types.ToolDefinition
+	MaxTokens    int
+	Temperature  float64
+	Tools        []types.ToolDefinition
 }
 
 // ChatResponse 聊天响应
 type ChatResponse struct {
-	ID            string
-	Model         string
-	Content       string
-	ToolCalls     []types.ToolCall
-	StopReason    string
-	InputTokens   int
-	OutputTokens  int
+	ID           string
+	Model        string
+	Content      string
+	ToolCalls    []types.ToolCall
+	StopReason   string
+	InputTokens  int
+	OutputTokens int
 }
 
 // NewClient 创建 LLM 客户端
@@ -51,13 +51,18 @@ func NewClient(provider, apiKey, model, baseURL, groupID string) (Client, error)
 	case "openai":
 		return NewOpenAIClient(apiKey, model, baseURL)
 	case "minimax":
+		if groupID == "" {
+			if baseURL == "" {
+				baseURL = "https://api.minimaxi.com/anthropic"
+			}
+			return NewAnthropicClient(apiKey, model, baseURL)
+		}
+
 		client, err := NewMinimaxClient(apiKey, model, baseURL)
 		if err != nil {
 			return nil, err
 		}
-		if groupID != "" {
-			client.SetGroupID(groupID)
-		}
+		client.SetGroupID(groupID)
 		return client, nil
 	default:
 		return NewAnthropicClient(apiKey, model, baseURL)
