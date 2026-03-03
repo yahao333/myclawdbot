@@ -53,8 +53,8 @@ func NewClient(provider, apiKey, model, baseURL, _ string) (Client, error) {
 		if baseURL == "" {
 			baseURL = "https://api.minimaxi.com/anthropic"
 		}
-		return NewAnthropicClient(apiKey, model, baseURL)
+		return NewMinimaxClient(apiKey, model, baseURL)
 	default:
-		return NewAnthropicClient(apiKey, model, baseURL)
+		return NewMinimaxClient(apiKey, model, baseURL)
 	}
 }

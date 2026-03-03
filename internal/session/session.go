@@ -219,6 +219,7 @@ func (s *Session) SendMessageStream(ctx context.Context, client llm.Client, cont
 
 	lastContent := ""
 	finalContent := ""
+	var finalToolCalls []types.ToolCall
 	for delta := range stream {
 		if delta == nil || delta.Content == "" {
 			continue
@@ -238,15 +239,38 @@ func (s *Session) SendMessageStream(ctx context.Context, client llm.Client, cont
 		finalContent = current
 	}
 
+	if finalContent == "" {
+		resp, err := client.Chat(ctx, req)
+		if err != nil {
+			return "", fmt.Errorf("llm error: %w", err)
+		}
+		finalContent = resp.Content
+		finalToolCalls = resp.ToolCalls
+	}
+
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
 	assistantMsg := types.Message{
 		Role:      "assistant",
 		Content:   finalContent,
+		ToolCalls: finalToolCalls,
 		Timestamp: time.Now(),
 	}
 	s.Messages = append(s.Messages, assistantMsg)
+
+	for _, tc := range finalToolCalls {
+		result, err := tools.Execute(ctx, tc.Name, tc.Args)
+		if err != nil {
+			result = fmt.Sprintf("error: %v", err)
+		}
+		toolResultMsg := types.Message{
+			Role:      "user",
+			Content:   result,
+			Timestamp: time.Now(),
+		}
+		s.Messages = append(s.Messages, toolResultMsg)
+	}
 
 	if len(s.Messages) > 100 {
 		s.Messages = s.Messages[len(s.Messages)-100:]

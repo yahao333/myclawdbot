@@ -1,12 +1,14 @@
 package llm
 
 import (
+	"bufio"
 	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/yahao333/myclawdbot/pkg/types"
@@ -40,8 +42,8 @@ func NewAnthropicClient(apiKey, model, baseURL string) (*AnthropicClient, error)
 	}
 
 	return &AnthropicClient{
-		apiKey: apiKey,
-		model:  model,
+		apiKey:  apiKey,
+		model:   model,
 		baseURL: baseURL,
 		httpClient: &http.Client{
 			Timeout: 120 * time.Second,
@@ -129,51 +131,75 @@ func (c *AnthropicClient) StreamChat(ctx context.Context, req *ChatRequest) (<-c
 		defer resp.Body.Close()
 		defer close(ch)
 
-		decoder := json.NewDecoder(resp.Body)
+		scanner := bufio.NewScanner(resp.Body)
+		scanner.Buffer(make([]byte, 0, 1024), 4*1024*1024)
 		var currentContent string
+		dataLines := make([]string, 0, 4)
 
-		for {
+		flushEvent := func() bool {
+			if len(dataLines) == 0 {
+				return true
+			}
+
+			data := strings.Join(dataLines, "\n")
+			dataLines = dataLines[:0]
+			data = strings.TrimSpace(data)
+			if data == "" || data == "[DONE]" {
+				return true
+			}
+
+			var event struct {
+				Type  string `json:"type"`
+				Delta struct {
+					Type string `json:"type"`
+					Text string `json:"text"`
+				} `json:"delta"`
+			}
+			if err := json.Unmarshal([]byte(data), &event); err != nil {
+				return true
+			}
+
+			switch event.Type {
+			case "content_block_delta":
+				if event.Delta.Type == "text_delta" {
+					currentContent += event.Delta.Text
+					ch <- &ChatResponse{Content: currentContent}
+				}
+			case "message_stop", "content_block_stop":
+				return false
+			}
+
+			return true
+		}
+
+		for scanner.Scan() {
 			select {
 			case <-ctx.Done():
 				return
 			default:
 			}
 
-			var event map[string]json.RawMessage
-			if err := decoder.Decode(&event); err != nil {
-				if err == io.EOF {
+			line := strings.TrimSpace(scanner.Text())
+			if line == "" {
+				if !flushEvent() {
 					return
 				}
 				continue
 			}
-
-			eventType, ok := event["type"]
-			if !ok {
+			if strings.HasPrefix(line, "event:") {
 				continue
 			}
 
-			switch string(eventType) {
-			case "content_block_delta":
-				delta, ok := event["delta"]
-				if !ok {
-					continue
-				}
-				var deltaObj struct {
-					Type string `json:"type"`
-					Text string `json:"text"`
-				}
-				if err := json.Unmarshal(delta, &deltaObj); err != nil {
-					continue
-				}
-				if deltaObj.Type == "text_delta" {
-					currentContent += deltaObj.Text
-					ch <- &ChatResponse{
-						Content: currentContent,
-					}
-				}
-			case "message_stop":
-				return
+			if !strings.HasPrefix(line, "data:") {
+				continue
 			}
+
+			data := strings.TrimSpace(strings.TrimPrefix(line, "data:"))
+			dataLines = append(dataLines, data)
+		}
+
+		if len(dataLines) > 0 {
+			flushEvent()
 		}
 	}()
 
@@ -196,7 +222,7 @@ func (c *AnthropicClient) buildRequestBody(req *ChatRequest) anthropicRequest {
 	messages := make([]anthropicMessage, len(req.Messages))
 	for i, msg := range req.Messages {
 		messages[i] = anthropicMessage{
-			Role: msg.Role,
+			Role:    msg.Role,
 			Content: msg.Content,
 		}
 	}
@@ -211,13 +237,13 @@ func (c *AnthropicClient) buildRequestBody(req *ChatRequest) anthropicRequest {
 	}
 
 	return anthropicRequest{
-		Model:         c.model,
-		Messages:      messages,
-		System:        req.SystemPrompt,
-		MaxTokens:     req.MaxTokens,
-		Temperature:   req.Temperature,
-		Tools:         tools,
-		Stream:        false,
+		Model:       c.model,
+		Messages:    messages,
+		System:      req.SystemPrompt,
+		MaxTokens:   req.MaxTokens,
+		Temperature: req.Temperature,
+		Tools:       tools,
+		Stream:      false,
 	}
 }
 
@@ -240,25 +266,25 @@ func (c *AnthropicClient) convertResponse(resp *anthropicResponse) *ChatResponse
 	}
 
 	return &ChatResponse{
-		ID:            resp.ID,
-		Model:         resp.Model,
-		Content:       content,
-		ToolCalls:     toolCalls,
-		StopReason:    resp.StopReason,
-		InputTokens:   resp.Usage.InputTokens,
-		OutputTokens:  resp.Usage.OutputTokens,
+		ID:           resp.ID,
+		Model:        resp.Model,
+		Content:      content,
+		ToolCalls:    toolCalls,
+		StopReason:   resp.StopReason,
+		InputTokens:  resp.Usage.InputTokens,
+		OutputTokens: resp.Usage.OutputTokens,
 	}
 }
 
 // API 请求/响应类型
 type anthropicRequest struct {
-	Model       string            `json:"model"`
+	Model       string             `json:"model"`
 	Messages    []anthropicMessage `json:"messages"`
-	System      string            `json:"system,omitempty"`
-	MaxTokens   int               `json:"max_tokens"`
-	Temperature float64           `json:"temperature,omitempty"`
-	Tools       []anthropicTool   `json:"tools,omitempty"`
-	Stream      bool              `json:"stream,omitempty"`
+	System      string             `json:"system,omitempty"`
+	MaxTokens   int                `json:"max_tokens"`
+	Temperature float64            `json:"temperature,omitempty"`
+	Tools       []anthropicTool    `json:"tools,omitempty"`
+	Stream      bool               `json:"stream,omitempty"`
 }
 
 type anthropicMessage struct {
@@ -273,21 +299,21 @@ type anthropicTool struct {
 }
 
 type anthropicResponse struct {
-	ID         string            `json:"id"`
-	Type       string            `json:"type"`
-	Role       string            `json:"role"`
+	ID         string                  `json:"id"`
+	Type       string                  `json:"type"`
+	Role       string                  `json:"role"`
 	Content    []anthropicContentBlock `json:"content"`
-	Model      string            `json:"model"`
-	StopReason string            `json:"stop_reason"`
-	Usage      anthropicUsage    `json:"usage"`
+	Model      string                  `json:"model"`
+	StopReason string                  `json:"stop_reason"`
+	Usage      anthropicUsage          `json:"usage"`
 }
 
 type anthropicContentBlock struct {
-	Type    string         `json:"type"`
-	Text    string         `json:"text,omitempty"`
-	ID      string         `json:"id,omitempty"`
-	Name    string         `json:"name,omitempty"`
-	Input   map[string]any `json:"input,omitempty"`
+	Type  string         `json:"type"`
+	Text  string         `json:"text,omitempty"`
+	ID    string         `json:"id,omitempty"`
+	Name  string         `json:"name,omitempty"`
+	Input map[string]any `json:"input,omitempty"`
 }
 
 type anthropicUsage struct {

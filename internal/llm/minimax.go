@@ -40,8 +40,8 @@ func NewMinimaxClient(apiKey, model, baseURL string) (*MinimaxClient, error) {
 	}
 
 	return &MinimaxClient{
-		apiKey: apiKey,
-		model:  model,
+		apiKey:  apiKey,
+		model:   model,
 		baseURL: baseURL,
 		httpClient: &http.Client{
 			Timeout: 120 * time.Second,
@@ -233,23 +233,23 @@ func (c *MinimaxClient) convertResponse(resp *minimaxResponse) *ChatResponse {
 	}
 
 	return &ChatResponse{
-		ID:            resp.ID,
-		Model:         resp.Model,
-		Content:       content,
-		ToolCalls:     toolCalls,
-		StopReason:    choice.FinishReason,
-		InputTokens:   resp.Usage.PromptTokens,
-		OutputTokens:  resp.Usage.CompletionTokens,
+		ID:           resp.ID,
+		Model:        resp.Model,
+		Content:      content,
+		ToolCalls:    toolCalls,
+		StopReason:   choice.FinishReason,
+		InputTokens:  resp.Usage.PromptTokens,
+		OutputTokens: resp.Usage.CompletionTokens,
 	}
 }
 
 // API 请求/响应类型
 type minimaxRequest struct {
-	Model       string            `json:"model"`
+	Model       string           `json:"model"`
 	Messages    []minimaxMessage `json:"messages"`
 	Temperature float64          `json:"temperature,omitempty"`
 	MaxTokens   int              `json:"max_tokens,omitempty"`
-	Tools       []minimaxTool   `json:"tools,omitempty"`
+	Tools       []minimaxTool    `json:"tools,omitempty"`
 	Stream      bool             `json:"stream,omitempty"`
 }
 
@@ -259,29 +259,29 @@ type minimaxMessage struct {
 }
 
 type minimaxTool struct {
-	Type      string          `json:"type"`
-	Function  minimaxFunction `json:"function"`
+	Type     string          `json:"type"`
+	Function minimaxFunction `json:"function"`
 }
 
 type minimaxFunction struct {
-	Name        string      `json:"name"`
-	Description string      `json:"description"`
-	Parameters  any         `json:"parameters"`
+	Name        string `json:"name"`
+	Description string `json:"description"`
+	Parameters  any    `json:"parameters"`
 }
 
 type minimaxResponse struct {
-	ID      string            `json:"id"`
-	Object  string            `json:"object"`
-	Created int64            `json:"created"`
-	Model   string            `json:"model"`
-	Choices []minimaxChoice  `json:"choices"`
-	Usage   minimaxUsage     `json:"usage"`
+	ID      string          `json:"id"`
+	Object  string          `json:"object"`
+	Created int64           `json:"created"`
+	Model   string          `json:"model"`
+	Choices []minimaxChoice `json:"choices"`
+	Usage   minimaxUsage    `json:"usage"`
 }
 
 type minimaxChoice struct {
-	Index        int             `json:"index"`
-	Message      minimaxMessage  `json:"message"`
-	FinishReason string          `json:"finish_reason"`
+	Index        int            `json:"index"`
+	Message      minimaxMessage `json:"message"`
+	FinishReason string         `json:"finish_reason"`
 }
 
 type minimaxChunk struct {
