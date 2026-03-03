@@ -1,4 +1,4 @@
-module github.com/myclawdbot/myclawdbot
+module github.com/yahao333/myclawdbot
 
 go 1.25.0
 
