@@ -14,10 +14,10 @@ import (
 
 // Manager 会话管理器
 type Manager struct {
-	mu        sync.RWMutex
-	sessions  map[string]*Session
+	mu         sync.RWMutex
+	sessions   map[string]*Session
 	maxHistory int
-	llmClient llm.Client
+	llmClient  llm.Client
 }
 
 // Session 会话
@@ -36,9 +36,9 @@ func NewManager(maxHistory int, client llm.Client) *Manager {
 	}
 
 	return &Manager{
-		sessions:  make(map[string]*Session),
+		sessions:   make(map[string]*Session),
 		maxHistory: maxHistory,
-		llmClient: client,
+		llmClient:  client,
 	}
 }
 
@@ -172,6 +172,98 @@ func (s *Session) SendMessage(ctx context.Context, client llm.Client, content st
 	s.UpdatedAt = time.Now()
 
 	return resp.Content, nil
+}
+
+func (s *Session) SendMessageStream(ctx context.Context, client llm.Client, content string, onDelta func(string)) (string, error) {
+	s.mu.Lock()
+
+	userMsg := types.Message{
+		Role:      "user",
+		Content:   content,
+		Timestamp: time.Now(),
+	}
+	s.Messages = append(s.Messages, userMsg)
+
+	messages := make([]types.Message, len(s.Messages))
+	copy(messages, s.Messages)
+
+	s.mu.Unlock()
+
+	toolDefs := tools.ToToolDefinitions()
+
+	req := &llm.ChatRequest{
+		Model:       "",
+		Messages:    messages,
+		MaxTokens:   4096,
+		Temperature: 0.7,
+		Tools:       toolDefs,
+	}
+
+	var stream <-chan *llm.ChatResponse
+	var err error
+	maxRetries := 3
+
+	for i := 0; i < maxRetries; i++ {
+		stream, err = client.StreamChat(ctx, req)
+		if err == nil {
+			break
+		}
+
+		if !isRetryableNetworkError(err.Error()) || i == maxRetries-1 {
+			return "", fmt.Errorf("llm error: %w", err)
+		}
+
+		fmt.Printf("网络错误，%d 秒后重试... (%d/%d)\n", time.Duration(i+1)*2, i+1, maxRetries)
+		time.Sleep(time.Duration(i+1) * 2 * time.Second)
+	}
+
+	lastContent := ""
+	finalContent := ""
+	for delta := range stream {
+		if delta == nil || delta.Content == "" {
+			continue
+		}
+
+		current := delta.Content
+		chunk := current
+		if strings.HasPrefix(current, lastContent) {
+			chunk = strings.TrimPrefix(current, lastContent)
+		}
+
+		if chunk != "" && onDelta != nil {
+			onDelta(chunk)
+		}
+
+		lastContent = current
+		finalContent = current
+	}
+
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	assistantMsg := types.Message{
+		Role:      "assistant",
+		Content:   finalContent,
+		Timestamp: time.Now(),
+	}
+	s.Messages = append(s.Messages, assistantMsg)
+
+	if len(s.Messages) > 100 {
+		s.Messages = s.Messages[len(s.Messages)-100:]
+	}
+
+	s.UpdatedAt = time.Now()
+
+	return finalContent, nil
+}
+
+func isRetryableNetworkError(errMsg string) bool {
+	return strings.Contains(errMsg, "EOF") ||
+		strings.Contains(errMsg, "connection") ||
+		strings.Contains(errMsg, "timeout") ||
+		strings.Contains(errMsg, "network") ||
+		strings.Contains(errMsg, "refused") ||
+		strings.Contains(errMsg, "reset")
 }
 
 // GetHistory 获取历史消息
