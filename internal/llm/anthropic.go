@@ -174,8 +174,10 @@ func (c *AnthropicClient) StreamChat(ctx context.Context, req *ChatRequest) (<-c
 					fmt.Printf("[anthropic-stream] emit text_delta bytes=%d total_bytes=%d\n", len(event.Delta.Text), len(currentContent))
 					ch <- &ChatResponse{Content: currentContent}
 				}
-			case "message_stop", "content_block_stop":
-				fmt.Printf("[anthropic-stream] stop event received: %s\n", event.Type)
+			case "content_block_stop":
+				fmt.Println("[anthropic-stream] content block finished, wait next block")
+			case "message_stop":
+				fmt.Println("[anthropic-stream] message stop received")
 				return false
 			}
 
