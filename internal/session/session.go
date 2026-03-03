@@ -3,6 +3,7 @@ package session
 import (
 	"context"
 	"fmt"
+	"strings"
 	"sync"
 	"time"
 
@@ -107,10 +108,32 @@ func (s *Session) SendMessage(ctx context.Context, client llm.Client, content st
 		Tools:       toolDefs,
 	}
 
-	// 发送请求
-	resp, err := client.Chat(ctx, req)
-	if err != nil {
-		return "", fmt.Errorf("llm error: %w", err)
+	// 发送请求（带重试机制）
+	var resp *llm.ChatResponse
+	var err error
+	maxRetries := 3
+
+	for i := 0; i < maxRetries; i++ {
+		resp, err = client.Chat(ctx, req)
+		if err == nil {
+			break
+		}
+
+		// 检查是否为网络错误，如果是则重试
+		errMsg := err.Error()
+		isNetworkError := strings.Contains(errMsg, "EOF") ||
+			strings.Contains(errMsg, "connection") ||
+			strings.Contains(errMsg, "timeout") ||
+			strings.Contains(errMsg, "network") ||
+			strings.Contains(errMsg, "refused") ||
+			strings.Contains(errMsg, "reset")
+
+		if !isNetworkError || i == maxRetries-1 {
+			return "", fmt.Errorf("llm error: %w", err)
+		}
+
+		fmt.Printf("网络错误，%d 秒后重试... (%d/%d)\n", time.Duration(i+1)*2, i+1, maxRetries)
+		time.Sleep(time.Duration(i+1) * 2 * time.Second)
 	}
 
 	s.mu.Lock()
