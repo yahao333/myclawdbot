@@ -294,3 +294,173 @@ func TestExpandHome(t *testing.T) {
 		}
 	}
 }
+
+// TestLoad_FileAccessRestrictions 测试文件访问限制配置
+func TestLoad_FileAccessRestrictions(t *testing.T) {
+	tmpDir := t.TempDir()
+	configPath := filepath.Join(tmpDir, "config.yaml")
+
+	configContent := `
+tools:
+  restrict_file_access: true
+  allowed_dirs:
+    - /tmp/allowed
+    - /home/user/data
+  current_dir: /home/user
+  max_file_size: 5242880
+`
+	err := os.WriteFile(configPath, []byte(configContent), 0644)
+	if err != nil {
+		t.Fatalf("failed to write config file: %v", err)
+	}
+
+	cfg, err := Load(configPath)
+	if err != nil {
+		t.Fatalf("failed to load config: %v", err)
+	}
+
+	// 验证文件访问限制配置
+	if !cfg.Tools.RestrictFileAccess {
+		t.Error("expected restrict_file_access to be true")
+	}
+	if len(cfg.Tools.AllowedDirs) != 2 {
+		t.Errorf("expected 2 allowed_dirs, got %d", len(cfg.Tools.AllowedDirs))
+	}
+	if cfg.Tools.CurrentDir != "/home/user" {
+		t.Errorf("expected current_dir '/home/user', got '%s'", cfg.Tools.CurrentDir)
+	}
+	if cfg.Tools.MaxFileSize != 5242880 {
+		t.Errorf("expected max_file_size 5242880, got %d", cfg.Tools.MaxFileSize)
+	}
+}
+
+// TestLoad_FileAccessRestrictionsDisabled 测试禁用文件访问限制
+func TestLoad_FileAccessRestrictionsDisabled(t *testing.T) {
+	tmpDir := t.TempDir()
+	configPath := filepath.Join(tmpDir, "config.yaml")
+
+	configContent := `
+tools:
+  restrict_file_access: false
+  allowed_dirs:
+    - /tmp/allowed
+`
+	err := os.WriteFile(configPath, []byte(configContent), 0644)
+	if err != nil {
+		t.Fatalf("failed to write config file: %v", err)
+	}
+
+	cfg, err := Load(configPath)
+	if err != nil {
+		t.Fatalf("failed to load config: %v", err)
+	}
+
+	// 验证文件访问限制配置
+	if cfg.Tools.RestrictFileAccess {
+		t.Error("expected restrict_file_access to be false")
+	}
+}
+
+// TestLoad_MemoryConfig 测试记忆配置
+func TestLoad_MemoryConfig(t *testing.T) {
+	tmpDir := t.TempDir()
+	configPath := filepath.Join(tmpDir, "config.yaml")
+
+	configContent := `
+memory:
+  enable: true
+  max_history: 200
+  max_tokens: 8000
+  enable_compress: true
+  enable_long_term: true
+  storage_dir: /tmp/memory
+  embedding_model: openai
+`
+	err := os.WriteFile(configPath, []byte(configContent), 0644)
+	if err != nil {
+		t.Fatalf("failed to write config file: %v", err)
+	}
+
+	cfg, err := Load(configPath)
+	if err != nil {
+		t.Fatalf("failed to load config: %v", err)
+	}
+
+	// 验证记忆配置
+	if !cfg.Memory.Enable {
+		t.Error("expected memory.enable to be true")
+	}
+	if cfg.Memory.MaxHistory != 200 {
+		t.Errorf("expected max_history 200, got %d", cfg.Memory.MaxHistory)
+	}
+	if cfg.Memory.MaxTokens != 8000 {
+		t.Errorf("expected max_tokens 8000, got %d", cfg.Memory.MaxTokens)
+	}
+	if !cfg.Memory.EnableCompress {
+		t.Error("expected enable_compress to be true")
+	}
+	if !cfg.Memory.EnableLongTerm {
+		t.Error("expected enable_long_term to be true")
+	}
+	if cfg.Memory.StorageDir != "/tmp/memory" {
+		t.Errorf("expected storage_dir '/tmp/memory', got '%s'", cfg.Memory.StorageDir)
+	}
+	if cfg.Memory.EmbeddingModel != "openai" {
+		t.Errorf("expected embedding_model 'openai', got '%s'", cfg.Memory.EmbeddingModel)
+	}
+}
+
+// TestLoadFromEnv_MemoryConfig 测试从环境变量加载记忆配置
+func TestLoadFromEnv_MemoryConfig(t *testing.T) {
+	// 保存原始环境变量
+	origEnable := os.Getenv("MEMORY_ENABLE")
+	origLongTerm := os.Getenv("MEMORY_LONG_TERM")
+	origStorageDir := os.Getenv("MEMORY_STORAGE_DIR")
+	origEmbeddingModel := os.Getenv("MEMORY_EMBEDDING_MODEL")
+
+	defer func() {
+		os.Setenv("MEMORY_ENABLE", origEnable)
+		os.Setenv("MEMORY_LONG_TERM", origLongTerm)
+		os.Setenv("MEMORY_STORAGE_DIR", origStorageDir)
+		os.Setenv("MEMORY_EMBEDDING_MODEL", origEmbeddingModel)
+	}()
+
+	// 设置环境变量
+	os.Setenv("MEMORY_ENABLE", "true")
+	os.Setenv("MEMORY_LONG_TERM", "true")
+	os.Setenv("MEMORY_STORAGE_DIR", "/custom/memory")
+	os.Setenv("MEMORY_EMBEDDING_MODEL", "openai")
+
+	cfg := LoadFromEnv()
+
+	// 验证记忆配置
+	if !cfg.Memory.Enable {
+		t.Error("expected memory.enable to be true")
+	}
+	if !cfg.Memory.EnableLongTerm {
+		t.Error("expected memory.enable_long_term to be true")
+	}
+	if cfg.Memory.EmbeddingModel != "openai" {
+		t.Errorf("expected embedding_model 'openai', got '%s'", cfg.Memory.EmbeddingModel)
+	}
+}
+
+// TestLoadFromEnv_FileAccessRestrictions 测试从环境变量加载文件访问限制配置
+func TestLoadFromEnv_FileAccessRestrictions(t *testing.T) {
+	cfg := LoadFromEnv()
+
+	// 验证当前目录设置（通过 getCwd() 获取）
+	if cfg.Tools.CurrentDir == "" {
+		t.Error("expected non-empty current_dir")
+	}
+
+	// 验证默认限制文件访问
+	if !cfg.Tools.RestrictFileAccess {
+		t.Error("expected restrict_file_access to be true by default")
+	}
+
+	// 验证默认 AllowedDirs 为空
+	if cfg.Tools.AllowedDirs != nil && len(cfg.Tools.AllowedDirs) != 0 {
+		t.Errorf("expected empty allowed_dirs by default, got %v", cfg.Tools.AllowedDirs)
+	}
+}
