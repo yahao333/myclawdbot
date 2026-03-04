@@ -468,7 +468,7 @@ func TestLoadFromEnv_FileAccessRestrictions(t *testing.T) {
 	}
 }
 
-func TestConfig_SetDefaults_NormalizesGatewayAPIKeys(t *testing.T) {
+func TestNormalizeGatewayAPIKeys(t *testing.T) {
 	plainKey := "test-api-key"
 	plainHash := sha256.Sum256([]byte(plainKey))
 	expectedPlainHash := hex.EncodeToString(plainHash[:])
@@ -476,22 +476,16 @@ func TestConfig_SetDefaults_NormalizesGatewayAPIKeys(t *testing.T) {
 	hashValue := sha256.Sum256([]byte("already-hashed"))
 	upperHash := strings.ToUpper(hex.EncodeToString(hashValue[:]))
 
-	cfg := &Config{
-		Gateway: GatewayConfig{
-			APIKeys: []string{plainKey, upperHash, "", "   ", plainKey},
-		},
-	}
+	normalized := normalizeGatewayAPIKeys([]string{plainKey, upperHash, "", "   ", plainKey})
 
-	cfg.setDefaults()
-
-	if len(cfg.Gateway.APIKeys) != 2 {
-		t.Fatalf("expected 2 normalized keys, got %d", len(cfg.Gateway.APIKeys))
+	if len(normalized) != 2 {
+		t.Fatalf("expected 2 normalized keys, got %d", len(normalized))
 	}
-	if cfg.Gateway.APIKeys[0] != expectedPlainHash {
-		t.Errorf("expected first key to be hashed plain key, got %s", cfg.Gateway.APIKeys[0])
+	if normalized[0] != expectedPlainHash {
+		t.Errorf("expected first key to be hashed plain key, got %s", normalized[0])
 	}
-	if cfg.Gateway.APIKeys[1] != strings.ToLower(upperHash) {
-		t.Errorf("expected second key to be normalized lowercase hash, got %s", cfg.Gateway.APIKeys[1])
+	if normalized[1] != strings.ToLower(upperHash) {
+		t.Errorf("expected second key to be normalized lowercase hash, got %s", normalized[1])
 	}
 }
 
