@@ -164,9 +164,9 @@ func (s *SessionMemory) Add(ctx context.Context, msg *types.Message) error {
 
 	s.messages = append(s.messages, *msg)
 
-	// 检查是否需要压缩
+	// 检查是否需要压缩（在锁内安全执行）
 	if s.config.EnableCompress && len(s.messages) > s.config.MaxHistory/2 {
-		s.compressIfNeeded()
+		s.compressIfNeededLocked()
 	}
 
 	return nil
@@ -213,9 +213,16 @@ func (s *SessionMemory) TokenCount() int {
 	return count
 }
 
-// compressIfNeeded 如果需要则压缩
+// compressIfNeeded 如果需要则压缩（需要外部加锁）
 func (s *SessionMemory) compressIfNeeded() {
-	if s.TokenCount() <= s.config.MaxTokens {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.compressIfNeededLocked()
+}
+
+// compressIfNeededLocked 在已加锁的情况下压缩
+func (s *SessionMemory) compressIfNeededLocked() {
+	if s.tokenCountLocked() <= s.config.MaxTokens {
 		return
 	}
 
@@ -227,6 +234,18 @@ func (s *SessionMemory) compressIfNeeded() {
 
 	// 保留最近的消息
 	s.messages = s.messages[len(s.messages)-keepCount:]
+}
+
+// tokenCountLocked 计算 token 数量（需要外部加锁）
+func (s *SessionMemory) tokenCountLocked() int {
+	count := 0
+	for _, msg := range s.messages {
+		// 简单估算: 1 token ≈ 4 字符
+		count += len(msg.Content) / 4
+		// 加上角色前缀
+		count += len(msg.Role) / 4
+	}
+	return count
 }
 
 // Clear 清除记忆
