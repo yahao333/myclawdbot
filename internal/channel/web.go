@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/gorilla/websocket"
+	"github.com/yahao333/myclawdbot/internal/llm"
 	"github.com/yahao333/myclawdbot/internal/session"
 )
 
@@ -37,6 +38,7 @@ type WebHandler struct {
 	config     *WebConfig
 	httpServer *http.Server
 	sessionMgr *session.Manager
+	client     llm.Client
 	upgrader   websocket.Upgrader
 	clients    map[string]*WebClient
 	clientsMu  sync.RWMutex
@@ -59,7 +61,7 @@ type WebMessage struct {
 }
 
 // NewWebHandler 创建 Web 处理器
-func NewWebHandler(cfg *WebConfig, sessMgr *session.Manager) *WebHandler {
+func NewWebHandler(cfg *WebConfig, sessMgr *session.Manager, client llm.Client) *WebHandler {
 	if cfg.Host == "" {
 		cfg.Host = "0.0.0.0"
 	}
@@ -73,13 +75,24 @@ func NewWebHandler(cfg *WebConfig, sessMgr *session.Manager) *WebHandler {
 	handler := &WebHandler{
 		config:     cfg,
 		sessionMgr: sessMgr,
-		clients:   make(map[string]*WebClient),
-		stopChan:  make(chan struct{}),
+		client:     client,
+		clients:    make(map[string]*WebClient),
+		stopChan:   make(chan struct{}),
 	}
 
 	handler.upgrader = websocket.Upgrader{
 		CheckOrigin: func(r *http.Request) bool {
-			return cfg.CORSEnabled
+			// 如果启用了 CORS，允许所有来源
+			if cfg.CORSEnabled {
+				return true
+			}
+			// 如果未启用 CORS，允许同源请求
+			origin := r.Header.Get("Origin")
+			if origin == "" {
+				return true // 同源请求没有 Origin 头
+			}
+			// 检查是否同源
+			return origin == "http://"+r.Host || origin == "https://"+r.Host
 		},
 		ReadBufferSize:  1024,
 		WriteBufferSize: 1024,
@@ -313,7 +326,7 @@ func (h *WebHandler) handleChat(w http.ResponseWriter, r *http.Request) {
 	}
 
 	ctx := r.Context()
-	response, err := sess.SendMessage(ctx, nil, req.Content)
+	response, err := sess.SendMessage(ctx, h.client, req.Content)
 	if err != nil {
 		json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
 		return
@@ -357,7 +370,7 @@ func (h *WebHandler) handleChatStream(w http.ResponseWriter, r *http.Request) {
 
 	fmt.Fprintf(w, "data: %s\n\n", fmt.Sprintf(`{"session_id": "%s", "type": "session"}`, sess.ID))
 
-	sess.SendMessageStream(ctx, nil, req.Content, func(delta string) {
+	sess.SendMessageStream(ctx, h.client, req.Content, func(delta string) {
 		fmt.Fprintf(w, "data: %s\n\n", fmt.Sprintf(`{"type": "content", "content": %s}`, delta))
 	})
 
@@ -513,7 +526,7 @@ func (h *WebHandler) handleClientMessage(client *WebClient, msg *WebMessage) {
 		}
 
 		go func() {
-			response, err := sess.SendMessage(ctx, nil, msg.Content)
+			response, err := sess.SendMessage(ctx, h.client, msg.Content)
 			if err != nil {
 				h.sendToClient(client, map[string]string{"type": "error", "content": err.Error()})
 				return
@@ -592,6 +605,6 @@ func (h *WebHandler) Type() string {
 	return "web"
 }
 
-func WebChannel(host string, port int, sessMgr *session.Manager) *WebHandler {
-	return NewWebHandler(&WebConfig{Host: host, Port: port}, sessMgr)
+func WebChannel(host string, port int, sessMgr *session.Manager, client llm.Client) *WebHandler {
+	return NewWebHandler(&WebConfig{Host: host, Port: port}, sessMgr, client)
 }
