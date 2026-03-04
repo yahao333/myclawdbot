@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/yahao333/myclawdbot/internal/llm"
+	"github.com/yahao333/myclawdbot/internal/memory"
 	"github.com/yahao333/myclawdbot/internal/tools"
 	"github.com/yahao333/myclawdbot/pkg/types"
 )
@@ -18,6 +19,7 @@ type Manager struct {
 	sessions   map[string]*Session
 	maxHistory int
 	llmClient  llm.Client
+	memoryMgr *memory.Manager
 }
 
 // Session 会话
@@ -27,18 +29,30 @@ type Session struct {
 	CreatedAt time.Time
 	UpdatedAt time.Time
 	mu        sync.Mutex
+	memory    *memory.SessionMemory
 }
 
 // NewManager 创建会话管理器
 func NewManager(maxHistory int, client llm.Client) *Manager {
+	return NewManagerWithMemory(maxHistory, client, nil)
+}
+
+// NewManagerWithMemory 创建带记忆管理的会话管理器
+func NewManagerWithMemory(maxHistory int, client llm.Client, memCfg *memory.Config) *Manager {
 	if maxHistory <= 0 {
 		maxHistory = 100
+	}
+
+	var memMgr *memory.Manager
+	if memCfg != nil {
+		memMgr = memory.NewManager(memCfg)
 	}
 
 	return &Manager{
 		sessions:   make(map[string]*Session),
 		maxHistory: maxHistory,
 		llmClient:  client,
+		memoryMgr:  memMgr,
 	}
 }
 
@@ -56,6 +70,11 @@ func (m *Manager) CreateSession(id string) *Session {
 		Messages:  make([]types.Message, 0),
 		CreatedAt: time.Now(),
 		UpdatedAt: time.Now(),
+	}
+
+	// 如果有 memory 管理器，创建会话记忆
+	if m.memoryMgr != nil {
+		sess.memory = m.memoryMgr.GetSession(id)
 	}
 
 	m.sessions[id] = sess
