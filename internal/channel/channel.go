@@ -2,8 +2,6 @@ package channel
 
 import (
 	"context"
-
-	"github.com/yahao333/myclawdbot/internal/session"
 )
 
 // Message 渠道消息
@@ -50,33 +48,9 @@ func NewChannel(channelType ChannelType, cfg interface{}, sessMgr interface{}) (
 		}
 		return handler, nil
 	case ChannelWeb:
-		webCfg := WebConfig{}
-		switch c := cfg.(type) {
-		case nil:
-		case WebConfig:
-			webCfg = c
-		case *WebConfig:
-			if c != nil {
-				webCfg = *c
-			}
-		default:
-			return nil, &ChannelError{"invalid web config"}
-		}
-
-		var manager *session.Manager
-		switch m := sessMgr.(type) {
-		case *session.Manager:
-			manager = m
-		case nil:
-		default:
-			return nil, &ChannelError{"invalid session manager"}
-		}
-
-		handler := NewWebHandler(&webCfg, manager)
-		if err := handler.Init(webCfg); err != nil {
-			return nil, err
-		}
-		return handler, nil
+		// Web 渠道需要通过 WebChannel 函数单独创建（需要 LLM client）
+		// 此处返回错误，请使用 channel.WebChannel() 函数
+		return nil, &ChannelError{"web channel requires WebChannel() function"}
 	default:
 		return nil, ErrUnsupportedChannel
 	}
