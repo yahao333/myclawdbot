@@ -3,38 +3,65 @@ package channel
 import (
 	"context"
 	"testing"
+
+	"github.com/yahao333/myclawdbot/internal/session"
 )
 
 func TestNewChannel(t *testing.T) {
 	tests := []struct {
-		name      string
+		name        string
 		channelType ChannelType
-		cfg       interface{}
-		wantError bool
+		cfg         interface{}
+		sessMgr     interface{}
+		wantError   bool
 	}{
 		{
 			name:        "telegram with valid config",
 			channelType: ChannelTelegram,
 			cfg:         TelegramConfig{BotToken: "test-token"},
+			sessMgr:     nil,
+			wantError:   false,
+		},
+		{
+			name:        "web with valid config",
+			channelType: ChannelWeb,
+			cfg:         WebConfig{Host: "127.0.0.1", Port: 8080},
+			sessMgr:     session.NewManager(10, nil),
 			wantError:   false,
 		},
 		{
 			name:        "unsupported channel",
 			channelType: ChannelDiscord,
 			cfg:         nil,
+			sessMgr:     nil,
 			wantError:   true,
 		},
 		{
 			name:        "invalid config type",
 			channelType: ChannelTelegram,
 			cfg:         "invalid",
+			sessMgr:     nil,
+			wantError:   true,
+		},
+		{
+			name:        "web invalid config type",
+			channelType: ChannelWeb,
+			cfg:         "invalid",
+			sessMgr:     session.NewManager(10, nil),
+			wantError:   true,
+		},
+		{
+			name:        "web invalid session manager type",
+			channelType: ChannelWeb,
+			cfg:         WebConfig{},
+			sessMgr:     "invalid",
 			wantError:   true,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			ch, err := NewChannel(tt.channelType, tt.cfg, nil)
+			ch, err := NewChannel(tt.channelType, tt.cfg, tt.sessMgr)
 			if tt.wantError {
 				if err == nil {
 					t.Error("expected error, got nil")
@@ -125,6 +152,9 @@ func TestChannelTypes(t *testing.T) {
 	}
 	if ChannelSlack != "slack" {
 		t.Errorf("ChannelSlack = %s, want 'slack'", ChannelSlack)
+	}
+	if ChannelWeb != "web" {
+		t.Errorf("ChannelWeb = %s, want 'web'", ChannelWeb)
 	}
 }
 
