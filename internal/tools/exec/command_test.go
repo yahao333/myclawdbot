@@ -60,12 +60,10 @@ func TestCommandTool_Execute(t *testing.T) {
 }
 
 func TestCommandTool_Execute_AllowedCommand(t *testing.T) {
-	// 由于 extractCommand 的 bug，只检查第一个字符
-	// 使用 "e" 作为允许列表
-	tool := NewCommandTool([]string{"e", "p", "l"}, 60)
+	tool := NewCommandTool([]string{"echo", "pwd", "ls"}, 60)
 	ctx := context.Background()
 
-	// 测试允许的命令 - "e" 开头
+	// 测试允许的命令
 	result, err := tool.Execute(ctx, map[string]any{"command": "echo hello"})
 	if err != nil {
 		t.Errorf("Execute() error: %v", err)
@@ -100,20 +98,18 @@ func TestCommandTool_Execute_Timeout(t *testing.T) {
 }
 
 func TestCommandTool_isCommandAllowed(t *testing.T) {
-	// 注意: 由于 extractCommand 的 bug，它只返回第一个字符
-	// 所以这里我们用单个字符作为允许列表来测试
-	tool := NewCommandTool([]string{"g", "l", "c"}, 60)
+	tool := NewCommandTool([]string{"go", "git", "ls"}, 60)
 
 	tests := []struct {
 		command string
 		want    bool
 	}{
-		{"go", true},           // g 在允许列表中
-		{"git status", true},   // g 在允许列表中
-		{"ls", true},           // l 在允许列表中
-		{"ls -la", true},       // l 在允许列表中
-		{"rm", false},          // r 不在允许列表中
-		{"cat /etc/passwd", true}, // c 在允许列表中
+		{"go", true},
+		{"git status", true},
+		{"ls", true},
+		{"ls -la", true},
+		{"rm", false},
+		{"cat /etc/passwd", false},
 	}
 
 	for _, tt := range tests {
@@ -125,23 +121,22 @@ func TestCommandTool_isCommandAllowed(t *testing.T) {
 }
 
 func TestExtractCommand(t *testing.T) {
-	// 注意: extractCommand 实现有 bug，它把字符分割成单个字符而不是单词
-	// 这个测试记录了当前行为，而不是期望行为
-	// 例如: "go test" 返回 "g" 而不是 "go"
-
 	tests := []struct {
 		input    string
-		expected string // 当前实际行为
+		expected string
 	}{
-		{"go test", "g"},     // bug: 应该是 "go"
-		{"ls -la", "l"},      // bug: 应该是 "ls"
-		{"git status", "g"},  // bug: 应该是 "git"
-		{"echo hello", "e"},   // bug: 应该是 "echo"
-		{"  echo hello", "e"}, // bug: 应该是 "echo"
-		{"echo", "e"},         // bug: 应该是 "echo"
-		{"\"echo\" hello", "h"}, // bug: 应该是 "echo"
-		{"'echo' hello", "h"},  // bug: 应该是 "echo"
+		{"go test", "go"},
+		{"ls -la", "ls"},
+		{"git status", "git"},
+		{"echo hello", "echo"},
+		{"  echo hello", "echo"},
+		{"echo", "echo"},
+		{"\"echo\" hello", "echo"},
+		{"'echo' hello", "echo"},
 		{"", ""},
+		{"\techo", "echo"},
+		{"\necho\n", "echo"},
+		{"echo\t\targ", "echo"},
 	}
 
 	for _, tt := range tests {
@@ -212,8 +207,7 @@ func TestCommandTool_Execute_Stderr(t *testing.T) {
 }
 
 func TestCommandTool_Execute_MultipleCommands(t *testing.T) {
-	// 由于 extractCommand 的 bug，只检查第一个字符
-	tool := NewCommandTool([]string{"e"}, 60)
+	tool := NewCommandTool([]string{"echo"}, 60)
 	ctx := context.Background()
 
 	// 测试多个命令
