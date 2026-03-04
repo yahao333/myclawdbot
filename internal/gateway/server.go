@@ -7,9 +7,9 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"net"
 	"net/http"
 	"os"
-	"os/signal"
 	"sync"
 	"time"
 
@@ -115,8 +115,7 @@ func registerTools(registry *tools.Registry, cfg *config.Config) {
 	registry.Register(fetchTool)
 }
 
-// Start 启动网关服务器
-// 阻塞直到服务器关闭
+// Start 启动网关服务器（非阻塞）
 func (s *Server) Start() error {
 	addr := fmt.Sprintf("%s:%d", s.config.Gateway.Host, s.config.Gateway.Port)
 
@@ -135,7 +134,49 @@ func (s *Server) Start() error {
 		IdleTimeout:  60 * time.Second,
 	}
 
-	// 启动服务器
+	// 启动服务器（非阻塞）
+	log.Printf("Gateway server starting on %s", addr)
+	if s.config.Gateway.EnableAuth {
+		log.Printf("Authentication enabled")
+	}
+	if s.config.Gateway.EnableSandbox {
+		log.Printf("Sandbox mode enabled with dirs: %v", s.config.Gateway.SandboxDirs)
+	}
+
+	listener, err := net.Listen("tcp", addr)
+	if err != nil {
+		return fmt.Errorf("server listen error: %w", err)
+	}
+
+	go func() {
+		if serveErr := s.httpServer.Serve(listener); serveErr != nil && serveErr != http.ErrServerClosed {
+			log.Printf("Gateway server error: %v", serveErr)
+		}
+	}()
+
+	return nil
+}
+
+// StartWithContext 启动网关服务器（支持 context 取消）
+func (s *Server) StartWithContext(ctx context.Context) error {
+	addr := fmt.Sprintf("%s:%d", s.config.Gateway.Host, s.config.Gateway.Port)
+
+	// 创建 HTTP 处理 mux
+	mux := http.NewServeMux()
+
+	// 注册路由
+	s.registerRoutes(mux)
+
+	// 创建 HTTP 服务器
+	s.httpServer = &http.Server{
+		Addr:         addr,
+		Handler:      s.loggingMiddleware(s.authMiddleware(mux)),
+		ReadTimeout:  30 * time.Second,
+		WriteTimeout: 30 * time.Second,
+		IdleTimeout:  60 * time.Second,
+	}
+
+	// 启动服务器（非阻塞）
 	go func() {
 		log.Printf("Gateway server starting on %s", addr)
 		if s.config.Gateway.EnableAuth {
@@ -145,21 +186,19 @@ func (s *Server) Start() error {
 			log.Printf("Sandbox mode enabled with dirs: %v", s.config.Gateway.SandboxDirs)
 		}
 		if err := s.httpServer.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			log.Printf("Server error: %v", err)
+			log.Printf("Gateway server error: %v", err)
 		}
 	}()
 
-	// 等待中断信号
-	quit := make(chan os.Signal, 1)
-	signal.Notify(quit, os.Interrupt)
-	<-quit
+	// 等待 context 取消
+	<-ctx.Done()
 
 	// 优雅关闭
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	log.Println("Shutting down server...")
-	if err := s.httpServer.Shutdown(ctx); err != nil {
+	log.Println("Gateway server shutting down...")
+	if err := s.httpServer.Shutdown(shutdownCtx); err != nil {
 		return fmt.Errorf("server forced to shutdown: %w", err)
 	}
 
@@ -445,7 +484,7 @@ func (c *wsClient) send(v interface{}) {
 // sendError 发送错误消息
 func (c *wsClient) sendError(err string) {
 	c.send(map[string]string{
-		"type": "error",
+		"type":  "error",
 		"error": err,
 	})
 }
