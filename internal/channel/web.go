@@ -219,7 +219,11 @@ const indexHTML = `<!DOCTYPE html>
 
         function connect() {
             ws = new WebSocket('ws://' + location.host + '/ws');
-            ws.onopen = () => console.log('Connected');
+            ws.onopen = () => {
+                console.log('Connected');
+                // 自动创建会话
+                createNewSession();
+            };
             ws.onclose = () => { console.log('Disconnected'); setTimeout(connect, 3000); };
             ws.onerror = (e) => console.error('WS Error:', e);
             ws.onmessage = (e) => {
@@ -235,6 +239,10 @@ const indexHTML = `<!DOCTYPE html>
                         addMessage('bot', msg.content);
                         document.getElementById('typing').classList.remove('active');
                     }
+                    break;
+                case 'session_created':
+                    currentSession = msg.session_id;
+                    sessions[msg.session_id] = [];
                     break;
                 case 'history':
                     sessions[msg.session_id] = msg.messages || [];
