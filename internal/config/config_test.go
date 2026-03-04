@@ -1,8 +1,11 @@
 package config
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -223,7 +226,7 @@ func TestConfig_SetDefaults_PreservesExisting(t *testing.T) {
 		},
 		Session: SessionConfig{
 			MaxHistory: 200,
-			StorageDir:  "/custom",
+			StorageDir: "/custom",
 		},
 		Gateway: GatewayConfig{
 			Port: 9000,
@@ -462,5 +465,61 @@ func TestLoadFromEnv_FileAccessRestrictions(t *testing.T) {
 	// 验证默认 AllowedDirs 为空
 	if cfg.Tools.AllowedDirs != nil && len(cfg.Tools.AllowedDirs) != 0 {
 		t.Errorf("expected empty allowed_dirs by default, got %v", cfg.Tools.AllowedDirs)
+	}
+}
+
+func TestConfig_SetDefaults_NormalizesGatewayAPIKeys(t *testing.T) {
+	plainKey := "test-api-key"
+	plainHash := sha256.Sum256([]byte(plainKey))
+	expectedPlainHash := hex.EncodeToString(plainHash[:])
+
+	hashValue := sha256.Sum256([]byte("already-hashed"))
+	upperHash := strings.ToUpper(hex.EncodeToString(hashValue[:]))
+
+	cfg := &Config{
+		Gateway: GatewayConfig{
+			APIKeys: []string{plainKey, upperHash, "", "   ", plainKey},
+		},
+	}
+
+	cfg.setDefaults()
+
+	if len(cfg.Gateway.APIKeys) != 2 {
+		t.Fatalf("expected 2 normalized keys, got %d", len(cfg.Gateway.APIKeys))
+	}
+	if cfg.Gateway.APIKeys[0] != expectedPlainHash {
+		t.Errorf("expected first key to be hashed plain key, got %s", cfg.Gateway.APIKeys[0])
+	}
+	if cfg.Gateway.APIKeys[1] != strings.ToLower(upperHash) {
+		t.Errorf("expected second key to be normalized lowercase hash, got %s", cfg.Gateway.APIKeys[1])
+	}
+}
+
+func TestLoad_NormalizesGatewayAPIKeysFromYAML(t *testing.T) {
+	tmpDir := t.TempDir()
+	configPath := filepath.Join(tmpDir, "config.yaml")
+	plainKey := "yaml-plain-key"
+	plainHash := sha256.Sum256([]byte(plainKey))
+	expectedHash := hex.EncodeToString(plainHash[:])
+
+	configContent := `
+gateway:
+  api_keys:
+    - yaml-plain-key
+`
+	if err := os.WriteFile(configPath, []byte(configContent), 0644); err != nil {
+		t.Fatalf("failed to write config file: %v", err)
+	}
+
+	cfg, err := Load(configPath)
+	if err != nil {
+		t.Fatalf("failed to load config: %v", err)
+	}
+
+	if len(cfg.Gateway.APIKeys) != 1 {
+		t.Fatalf("expected 1 api key, got %d", len(cfg.Gateway.APIKeys))
+	}
+	if cfg.Gateway.APIKeys[0] != expectedHash {
+		t.Errorf("expected normalized hash %s, got %s", expectedHash, cfg.Gateway.APIKeys[0])
 	}
 }
