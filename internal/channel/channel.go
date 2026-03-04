@@ -35,6 +35,7 @@ const (
 	ChannelTelegram ChannelType = "telegram"
 	ChannelDiscord  ChannelType = "discord"
 	ChannelSlack    ChannelType = "slack"
+	ChannelWeb      ChannelType = "web"
 )
 
 // NewChannel 创建渠道
@@ -46,6 +47,9 @@ func NewChannel(channelType ChannelType, cfg interface{}, sessMgr interface{}) (
 			return nil, err
 		}
 		return handler, nil
+	case ChannelWeb:
+		// Web 渠道需要特殊处理，因为它是服务器而不是处理器
+		return nil, ErrUnsupportedChannel
 	default:
 		return nil, ErrUnsupportedChannel
 	}
