@@ -5,14 +5,16 @@ import (
 	"context"
 	"fmt"
 	"os/exec"
+	"path/filepath"
+	"strings"
 	"time"
 )
 
 // CommandTool 命令执行工具
 type CommandTool struct {
 	allowedCommands []string
-	maxExecTime    time.Duration
-	dir            string
+	maxExecTime     time.Duration
+	dir             string
 }
 
 func NewCommandTool(allowedCommands []string, maxExecTime int) *CommandTool {
@@ -24,10 +26,11 @@ func NewCommandTool(allowedCommands []string, maxExecTime int) *CommandTool {
 	if len(allowedCommands) == 0 {
 		allowedCommands = []string{"go", "git", "ls", "cat", "pwd", "echo", "mkdir", "rm", "cp", "mv", "cd", "find", "grep"}
 	}
+	allowedCommands = normalizeAllowedCommands(allowedCommands)
 
 	return &CommandTool{
 		allowedCommands: allowedCommands,
-		maxExecTime:    time.Duration(maxExecTime) * time.Second,
+		maxExecTime:     time.Duration(maxExecTime) * time.Second,
 	}
 }
 
@@ -108,7 +111,10 @@ func (t *CommandTool) Execute(ctx context.Context, params map[string]any) (strin
 }
 
 func (t *CommandTool) isCommandAllowed(command string) bool {
-	cmd := extractCommand(command)
+	cmd := normalizeCommandName(extractCommand(command))
+	if cmd == "" {
+		return false
+	}
 	for _, allowed := range t.allowedCommands {
 		if cmd == allowed {
 			return true
@@ -161,6 +167,39 @@ func extractCommand(command string) string {
 	}
 
 	return command
+}
+
+func normalizeAllowedCommands(commands []string) []string {
+	normalized := make([]string, 0, len(commands))
+	seen := make(map[string]struct{}, len(commands))
+
+	for _, cmd := range commands {
+		n := normalizeCommandName(extractCommand(cmd))
+		if n == "" {
+			continue
+		}
+		if _, ok := seen[n]; ok {
+			continue
+		}
+		seen[n] = struct{}{}
+		normalized = append(normalized, n)
+	}
+
+	return normalized
+}
+
+func normalizeCommandName(command string) string {
+	cmd := strings.TrimSpace(command)
+	if cmd == "" {
+		return ""
+	}
+
+	cmd = strings.Trim(cmd, `"'`)
+	if cmd == "" {
+		return ""
+	}
+
+	return filepath.Base(cmd)
 }
 
 // Bash 别名
