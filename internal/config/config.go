@@ -3,8 +3,11 @@
 package config
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"gopkg.in/yaml.v3"
 )
@@ -24,7 +27,7 @@ type Config struct {
 // 配置 LLM 供应商、API 密钥、模型等
 type LLMConfig struct {
 	Provider string `yaml:"provider"` // LLM 供应商：anthropic, openai, minimax
-	APIKey   string `yaml:"api_key"` // API 密钥
+	APIKey   string `yaml:"api_key"`  // API 密钥
 	Model    string `yaml:"model"`    // 模型名称
 	BaseURL  string `yaml:"base_url"` // 自定义 API 端点（可选）
 	GroupID  string `yaml:"group_id"` // 群组 ID（用于 Minimax 兼容模式，当前版本不使用）
@@ -46,9 +49,9 @@ type TelegramConfig struct {
 // 定义可执行的命令、文件访问限制等安全策略
 type ToolsConfig struct {
 	AllowedCommands []string `yaml:"allowed_commands"` // 允许执行的系统命令列表
-	BlockedPaths    []string `yaml:"blocked_paths"`  // 禁止访问的路径模式
-	MaxFileSize     int64    `yaml:"max_file_size"`  // 最大文件大小（字节）
-	MaxExecTime     int      `yaml:"max_exec_time"`  // 命令最大执行时间（秒）
+	BlockedPaths    []string `yaml:"blocked_paths"`    // 禁止访问的路径模式
+	MaxFileSize     int64    `yaml:"max_file_size"`    // 最大文件大小（字节）
+	MaxExecTime     int      `yaml:"max_exec_time"`    // 命令最大执行时间（秒）
 
 	// 文件访问限制配置
 	AllowedDirs        []string `yaml:"allowed_dirs"`         // 允许访问的目录列表（白名单）
@@ -66,20 +69,24 @@ type SessionConfig struct {
 // MemoryConfig 记忆配置
 // 控制短期会话记忆和长期向量记忆
 type MemoryConfig struct {
-	Enable          bool   `yaml:"enable"`            // 是否启用记忆功能
-	MaxHistory      int    `yaml:"max_history"`       // 短期记忆最大消息数
-	MaxTokens       int    `yaml:"max_tokens"`        // 最大 token 数限制
-	EnableCompress  bool   `yaml:"enable_compress"`   // 是否启用自动压缩（当 token 超限时压缩历史）
-	EnableLongTerm  bool   `yaml:"enable_long_term"`  // 是否启用长期记忆（向量存储）
-	StorageDir      string `yaml:"storage_dir"`       // 记忆数据存储目录
-	EmbeddingModel  string `yaml:"embedding_model"`   // 向量嵌入模型：simple, openai, claude
+	Enable         bool   `yaml:"enable"`           // 是否启用记忆功能
+	MaxHistory     int    `yaml:"max_history"`      // 短期记忆最大消息数
+	MaxTokens      int    `yaml:"max_tokens"`       // 最大 token 数限制
+	EnableCompress bool   `yaml:"enable_compress"`  // 是否启用自动压缩（当 token 超限时压缩历史）
+	EnableLongTerm bool   `yaml:"enable_long_term"` // 是否启用长期记忆（向量存储）
+	StorageDir     string `yaml:"storage_dir"`      // 记忆数据存储目录
+	EmbeddingModel string `yaml:"embedding_model"`  // 向量嵌入模型：simple, openai, claude
 }
 
 // GatewayConfig 网关配置
-// WebSocket 网关的监听地址
+// WebSocket 网关的监听地址、认证和安全设置
 type GatewayConfig struct {
-	Host string `yaml:"host"` // 监听主机地址
-	Port int    `yaml:"port"` // 监听端口号
+	Host          string   `yaml:"host"`           // 监听主机地址
+	Port          int      `yaml:"port"`           // 监听端口号
+	EnableAuth    bool     `yaml:"enable_auth"`    // 是否启用认证
+	APIKeys       []string `yaml:"api_keys"`       // 允许的 API Key SHA256 哈希值列表
+	EnableSandbox bool     `yaml:"enable_sandbox"` // 是否启用沙盒模式（限制文件访问和命令执行）
+	SandboxDirs   []string `yaml:"sandbox_dirs"`   // 沙盒允许访问的目录列表
 }
 
 // Load 从 YAML 文件加载配置
@@ -100,6 +107,7 @@ func Load(path string) (*Config, error) {
 
 	// 设置默认值
 	cfg.setDefaults()
+	cfg.Gateway.APIKeys = normalizeGatewayAPIKeys(cfg.Gateway.APIKeys)
 
 	return &cfg, nil
 }
@@ -127,12 +135,12 @@ func LoadFromEnv() *Config {
 		},
 		Tools: ToolsConfig{
 			AllowedCommands:    []string{"go", "git", "ls", "cat", "pwd", "echo", "mkdir", "rm", "cp", "mv"},
-			BlockedPaths:        []string{"/etc", "/root", "/home/*/.*ssh"},
-			MaxFileSize:         10 * 1024 * 1024, // 10MB
-			MaxExecTime:         300,                // 5分钟
-			RestrictFileAccess:  true,              // 默认限制文件访问
-			AllowedDirs:         []string{},         // 自定义允许目录
-			CurrentDir:          getCwd(),           // 当前工作目录
+			BlockedPaths:       []string{"/etc", "/root", "/home/*/.*ssh"},
+			MaxFileSize:        10 * 1024 * 1024, // 10MB
+			MaxExecTime:        300,              // 5分钟
+			RestrictFileAccess: true,             // 默认限制文件访问
+			AllowedDirs:        []string{},       // 自定义允许目录
+			CurrentDir:         getCwd(),         // 当前工作目录
 		},
 		Session: SessionConfig{
 			MaxHistory: 100,
@@ -148,8 +156,12 @@ func LoadFromEnv() *Config {
 			EmbeddingModel: getEnv("MEMORY_EMBEDDING_MODEL", "simple"),
 		},
 		Gateway: GatewayConfig{
-			Host: getEnv("GATEWAY_HOST", "localhost"),
-			Port: 8080,
+			Host:          getEnv("GATEWAY_HOST", "localhost"),
+			Port:          8080,
+			EnableAuth:    getEnv("GATEWAY_ENABLE_AUTH", "false") == "true",
+			APIKeys:       []string{},
+			EnableSandbox: getEnv("GATEWAY_ENABLE_SANDBOX", "false") == "true",
+			SandboxDirs:   []string{},
 		},
 		Channel: ChannelConfig{
 			Type: getEnv("CHANNEL_TYPE", "terminal"),
@@ -166,6 +178,7 @@ func LoadFromEnv() *Config {
 
 	// 展开 ~ 为用户目录
 	cfg.Session.StorageDir = expandHome(cfg.Session.StorageDir)
+	cfg.Gateway.APIKeys = normalizeGatewayAPIKeys(cfg.Gateway.APIKeys)
 
 	return cfg
 }
@@ -195,6 +208,48 @@ func (c *Config) setDefaults() {
 	if c.Gateway.Port == 0 {
 		c.Gateway.Port = 8080
 	}
+	if c.Gateway.Host == "" {
+		c.Gateway.Host = "localhost"
+	}
+	// 默认沙盒目录为当前工作目录
+	if len(c.Gateway.SandboxDirs) == 0 {
+		c.Gateway.SandboxDirs = []string{getCwd()}
+	}
+}
+
+func normalizeGatewayAPIKeys(apiKeys []string) []string {
+	if len(apiKeys) == 0 {
+		return apiKeys
+	}
+	normalized := make([]string, 0, len(apiKeys))
+	seen := make(map[string]struct{}, len(apiKeys))
+	for _, key := range apiKeys {
+		hashed := normalizeAPIKeyHash(key)
+		if hashed == "" {
+			continue
+		}
+		if _, exists := seen[hashed]; exists {
+			continue
+		}
+		seen[hashed] = struct{}{}
+		normalized = append(normalized, hashed)
+	}
+	return normalized
+}
+
+func normalizeAPIKeyHash(key string) string {
+	trimmed := strings.TrimSpace(key)
+	if trimmed == "" {
+		return ""
+	}
+	lower := strings.ToLower(trimmed)
+	if len(lower) == 64 {
+		if _, err := hex.DecodeString(lower); err == nil {
+			return lower
+		}
+	}
+	hash := sha256.Sum256([]byte(trimmed))
+	return hex.EncodeToString(hash[:])
 }
 
 // getEnv 获取环境变量值
