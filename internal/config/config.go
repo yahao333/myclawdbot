@@ -42,6 +42,11 @@ type ToolsConfig struct {
 	BlockedPaths    []string `yaml:"blocked_paths"`    // 禁止访问的路径
 	MaxFileSize     int64    `yaml:"max_file_size"`    // 最大文件大小 (bytes)
 	MaxExecTime     int      `yaml:"max_exec_time"`    // 最大执行时间 (秒)
+
+	// 文件访问限制
+	AllowedDirs      []string `yaml:"allowed_dirs"`       // 允许访问的目录列表
+	RestrictFileAccess bool    `yaml:"restrict_file_access"` // 是否限制文件访问（默认 true，仅允许当前目录）
+	CurrentDir       string   `yaml:"current_dir"`        // 当前工作目录（用于限制文件访问）
 }
 
 // SessionConfig 会话配置
@@ -89,10 +94,13 @@ func LoadFromEnv() *Config {
 			GroupID:  getEnv("MINIMAX_GROUP_ID", ""),
 		},
 		Tools: ToolsConfig{
-			AllowedCommands: []string{"go", "git", "ls", "cat", "pwd", "echo", "mkdir", "rm", "cp", "mv"},
-			BlockedPaths:    []string{"/etc", "/root", "/home/*/.*ssh"},
-			MaxFileSize:     10 * 1024 * 1024, // 10MB
-			MaxExecTime:     300,              // 5分钟
+			AllowedCommands:    []string{"go", "git", "ls", "cat", "pwd", "echo", "mkdir", "rm", "cp", "mv"},
+			BlockedPaths:        []string{"/etc", "/root", "/home/*/.*ssh"},
+			MaxFileSize:         10 * 1024 * 1024, // 10MB
+			MaxExecTime:         300,                // 5分钟
+			RestrictFileAccess:  true,              // 默认限制文件访问
+			AllowedDirs:         []string{},         // 自定义允许目录
+			CurrentDir:          getCwd(),           // 当前工作目录
 		},
 		Session: SessionConfig{
 			MaxHistory: 100,
@@ -152,6 +160,14 @@ func getEnv(key, defaultValue string) string {
 		return value
 	}
 	return defaultValue
+}
+
+func getCwd() string {
+	cwd, err := os.Getwd()
+	if err != nil {
+		return "/"
+	}
+	return cwd
 }
 
 func expandHome(path string) string {
