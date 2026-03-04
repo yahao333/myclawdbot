@@ -118,37 +118,48 @@ func (t *CommandTool) isCommandAllowed(command string) bool {
 }
 
 func extractCommand(command string) string {
-	parts := []string{}
-	inQuote := false
-	var quoteChar byte
-
-	for i, c := range command {
-		if i == 0 && (c == '"' || c == '\'') {
-			inQuote = true
-			quoteChar = byte(c)
-			continue
+	// 去除前导空白
+	i := 0
+	for ; i < len(command); i++ {
+		if command[i] != ' ' && command[i] != '\t' && command[i] != '\n' && command[i] != '\r' {
+			break
 		}
+	}
+	command = command[i:]
 
-		if inQuote && byte(c) == quoteChar {
-			inQuote = false
-			continue
-		}
+	if len(command) == 0 {
+		return ""
+	}
 
-		if !inQuote && (c == ' ' || c == '\t' || c == '\n' || c == '\r') {
-			if len(parts) > 0 {
+	// 处理引号包围的命令
+	if command[0] == '"' || command[0] == '\'' {
+		quoteChar := command[0]
+		// 找到结束引号
+		end := 1
+		for ; end < len(command); end++ {
+			if command[end] == quoteChar {
+				// 检查引号后面是否还有字符（可能有空格分隔）
 				break
 			}
-			continue
 		}
-
-		if !inQuote {
-			parts = append(parts, string(c))
+		if end > 1 {
+			return command[1:end]
 		}
 	}
 
-	if len(parts) > 0 {
-		return parts[0]
+	// 提取第一个单词
+	wordEnd := 0
+	for ; wordEnd < len(command); wordEnd++ {
+		if command[wordEnd] == ' ' || command[wordEnd] == '\t' ||
+			command[wordEnd] == '\n' || command[wordEnd] == '\r' {
+			break
+		}
 	}
+
+	if wordEnd > 0 {
+		return command[:wordEnd]
+	}
+
 	return command
 }
 
