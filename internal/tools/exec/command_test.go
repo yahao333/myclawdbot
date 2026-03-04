@@ -120,6 +120,18 @@ func TestCommandTool_isCommandAllowed(t *testing.T) {
 	}
 }
 
+func TestCommandTool_isCommandAllowed_PathCompatibility(t *testing.T) {
+	tool := NewCommandTool([]string{"echo"}, 60)
+	if !tool.isCommandAllowed("/usr/bin/echo hello") {
+		t.Error("expected path command to be allowed by basename")
+	}
+
+	toolWithPath := NewCommandTool([]string{"/usr/bin/echo"}, 60)
+	if !toolWithPath.isCommandAllowed("echo hello") {
+		t.Error("expected basename command to be allowed by path whitelist")
+	}
+}
+
 func TestExtractCommand(t *testing.T) {
 	tests := []struct {
 		input    string
@@ -169,6 +181,17 @@ func TestNewCommandTool_CustomValues(t *testing.T) {
 	}
 	if tool.maxExecTime != 60*time.Second {
 		t.Errorf("maxExecTime = %v, want 1m0s", tool.maxExecTime)
+	}
+}
+
+func TestNewCommandTool_NormalizesAllowedCommands(t *testing.T) {
+	tool := NewCommandTool([]string{" /usr/bin/echo ", "echo -n", "echo", "'echo'"}, 60)
+
+	if len(tool.allowedCommands) != 1 {
+		t.Fatalf("allowedCommands = %v, want one normalized command", tool.allowedCommands)
+	}
+	if tool.allowedCommands[0] != "echo" {
+		t.Fatalf("allowedCommands[0] = %q, want %q", tool.allowedCommands[0], "echo")
 	}
 }
 
