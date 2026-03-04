@@ -39,7 +39,7 @@ const (
 )
 
 // NewChannel 创建渠道
-func NewChannel(channelType ChannelType, cfg interface{}, sessMgr interface{}) (Channel, error) {
+func NewChannel(channelType ChannelType, cfg interface{}) (Channel, error) {
 	switch channelType {
 	case ChannelTelegram:
 		handler := &TelegramHandler{}
