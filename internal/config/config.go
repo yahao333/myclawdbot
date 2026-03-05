@@ -22,6 +22,8 @@ type Config struct {
 	Gateway GatewayConfig `yaml:"gateway"` // 网关配置（主机、端口）
 	Channel ChannelConfig `yaml:"channel"` // 渠道配置（终端、Telegram 等）
 	Auth    AuthConfig    `yaml:"auth"`    // 认证配置（OAuth 等）
+	Log     LogConfig     `yaml:"log"`     // 日志配置
+	Debug   DebugConfig   `yaml:"debug"`   // 调试配置
 }
 
 // LLMConfig 大语言模型配置
@@ -125,6 +127,24 @@ type GoogleAuthConfig struct {
 	RedirectURL  string `yaml:"redirect_url"`   // 回调 URL
 }
 
+// LogConfig 日志配置
+// 控制日志级别、输出格式、输出目标等
+type LogConfig struct {
+	Level      string `yaml:"level"`       // 日志级别：debug, info, warn, error
+	JSONFormat bool   `yaml:"json_format"` // 是否使用 JSON 格式输出
+	Output     string `yaml:"output"`      // 输出文件路径（空则输出到标准输出）
+	Prefix     string `yaml:"prefix"`      // 日志前缀
+}
+
+// DebugConfig 调试配置
+// 控制调试模式、详细程度等
+type DebugConfig struct {
+	Enable       bool   `yaml:"enable"`        // 是否启用调试模式
+	Level        string `yaml:"level"`         // 调试详细程度：basic, detailed, comprehensive
+	OutputDir    string `yaml:"output_dir"`    // 调试信息输出目录
+	EnableReport bool   `yaml:"enable_report"` // 是否启用调试报告生成
+}
+
 // Load 从 YAML 文件加载配置
 // path: 配置文件路径
 // 返回配置对象或错误信息
@@ -225,6 +245,18 @@ func LoadFromEnv() *Config {
 				RedirectURL:  getEnv("GOOGLE_REDIRECT_URL", ""),
 			},
 		},
+		Log: LogConfig{
+			Level:      getEnv("LOG_LEVEL", "info"),
+			JSONFormat: getEnv("LOG_JSON", "false") == "true",
+			Output:     getEnv("LOG_OUTPUT", ""),
+			Prefix:     getEnv("LOG_PREFIX", ""),
+		},
+		Debug: DebugConfig{
+			Enable:       getEnv("DEBUG", "") == "true" || getEnv("DEBUG", "") == "1",
+			Level:        getEnv("DEBUG_LEVEL", "detailed"),
+			OutputDir:    getEnv("DEBUG_OUTPUT_DIR", ""),
+			EnableReport: getEnv("DEBUG_ENABLE_REPORT", "false") == "true",
+		},
 	}
 
 	// 如果没有设置 MINIMAX_API_KEY，使用用户提供的
@@ -270,6 +302,14 @@ func (c *Config) setDefaults() {
 	// 默认沙盒目录为当前工作目录
 	if len(c.Gateway.SandboxDirs) == 0 {
 		c.Gateway.SandboxDirs = []string{getCwd()}
+	}
+	// 日志配置默认值
+	if c.Log.Level == "" {
+		c.Log.Level = "info"
+	}
+	// 调试配置默认值
+	if c.Debug.Level == "" {
+		c.Debug.Level = "detailed"
 	}
 }
 

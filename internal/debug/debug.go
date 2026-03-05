@@ -25,6 +25,8 @@ import (
 	runtimeDebug "runtime/debug"
 	"strings"
 	"time"
+
+	"github.com/yahao333/myclawdbot/internal/config"
 )
 
 // DetailLevel 调试信息详细程度
@@ -94,6 +96,19 @@ func DebugLevel() DetailLevel {
 		return Detailed
 	}
 	return ParseDetailLevel(level)
+}
+
+// DebugLevelFromConfig 从 config.DebugConfig 获取调试详细级别
+func DebugLevelFromConfig(cfg *config.DebugConfig) DetailLevel {
+	if cfg.Level == "" {
+		return Detailed
+	}
+	return ParseDetailLevel(cfg.Level)
+}
+
+// IsDebugEnabledFromConfig 检查是否启用调试模式（从配置）
+func IsDebugEnabledFromConfig(cfg *config.DebugConfig) bool {
+	return cfg.Enable
 }
 
 // DebugInfo 调试信息收集器

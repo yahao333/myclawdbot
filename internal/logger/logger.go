@@ -20,6 +20,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/yahao333/myclawdbot/internal/config"
 )
 
 // Level 日志级别
@@ -193,6 +195,26 @@ func New(opts ...Option) *Logger {
 func NewFromConfig(cfg *Config) *Logger {
 	opts := []Option{
 		WithLevel(cfg.Level),
+		WithJSONFormat(cfg.JSONFormat),
+	}
+
+	if cfg.Output != "" {
+		opts = append(opts, WithOutput(cfg.Output))
+	}
+
+	if cfg.Prefix != "" {
+		opts = append(opts, WithPrefix(cfg.Prefix))
+	}
+
+	return New(opts...)
+}
+
+// NewFromLogConfig 从 config.LogConfig 创建日志记录器
+// cfg: 配置对象
+// 返回配置好的日志记录器
+func NewFromLogConfig(cfg *config.LogConfig) *Logger {
+	opts := []Option{
+		WithLevel(ParseLevel(cfg.Level)),
 		WithJSONFormat(cfg.JSONFormat),
 	}
 
