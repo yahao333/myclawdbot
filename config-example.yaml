@@ -1,0 +1,136 @@
+# MyClawDBot 配置文件
+# 复制此文件为 config.yaml 并根据需要修改配置
+
+# LLM 大语言模型配置
+llm:
+  # LLM 供应商：anthropic, openai, minimax
+  provider: minimax
+  # API 密钥
+  api_key: ""
+  # 模型名称
+  model: MiniMax-M2.5
+  # 自定义 API 端点（可选）
+  base_url: https://api.minimaxi.com/anthropic
+  # 群组 ID（用于 Minimax 兼容模式）
+  group_id: ""
+
+# 工具配置
+tools:
+  # 允许执行的系统命令列表
+  allowed_commands:
+    - go
+    - git
+    - ls
+    - cat
+    - pwd
+    - echo
+    - mkdir
+    - rm
+    - cp
+    - mv
+  # 禁止访问的路径模式
+  blocked_paths:
+    - /etc
+    - /root
+    - /home/*/.*ssh
+  # 最大文件大小（字节）
+  max_file_size: 10485760  # 10MB
+  # 命令最大执行时间（秒）
+  max_exec_time: 300  # 5分钟
+  # 是否限制文件访问（默认 true，仅允许当前目录）
+  restrict_file_access: true
+  # 允许访问的目录列表（白名单）
+  allowed_dirs: []
+  # 当前工作目录
+  current_dir: ""
+
+# 会话配置
+session:
+  # 单个会话最大历史消息数
+  max_history: 100
+  # 会话数据存储目录
+  storage_dir: ~/.myclawdbot/sessions
+
+# 记忆配置
+memory:
+  # 是否启用记忆功能
+  enable: false
+  # 短期记忆最大消息数
+  max_history: 100
+  # 最大 token 数限制
+  max_tokens: 4000
+  # 是否启用自动压缩
+  enable_compress: true
+  # 是否启用长期记忆（向量存储）
+  enable_long_term: false
+  # 记忆数据存储目录
+  storage_dir: ~/.myclawdbot/memory
+  # 向量嵌入模型：simple, openai, claude
+  embedding_model: simple
+
+# 网关配置
+gateway:
+  # 监听主机地址
+  host: localhost
+  # 监听端口号
+  port: 8080
+  # 是否启用认证
+  enable_auth: false
+  # 允许的 API Key SHA256 哈希值列表
+  api_keys: []
+  # 是否启用沙盒模式
+  enable_sandbox: false
+  # 沙盒允许访问的目录列表
+  sandbox_dirs: []
+
+# 渠道配置
+channel:
+  # 渠道类型：terminal, telegram, discord, slack
+  type: terminal
+  # Telegram 配置
+  telegram:
+    bot_token: ""
+  # Discord 配置
+  discord:
+    bot_token: ""
+  # Slack 配置
+  slack:
+    bot_token: ""
+    signin_secret: ""
+
+# 认证配置
+auth:
+  # 是否启用 OAuth 认证
+  enable: false
+  # GitHub OAuth 配置
+  github:
+    client_id: ""
+    client_secret: ""
+    redirect_url: ""
+  # Google OAuth 配置
+  google:
+    client_id: ""
+    client_secret: ""
+    redirect_url: ""
+
+# 日志配置
+log:
+  # 日志级别：debug, info, warn, error
+  level: info
+  # 是否使用 JSON 格式输出
+  json_format: false
+  # 输出文件路径（空则输出到标准输出）
+  output: ""
+  # 日志前缀
+  prefix: ""
+
+# 调试配置
+debug:
+  # 是否启用调试模式
+  enable: false
+  # 调试详细程度：basic, detailed, comprehensive
+  level: detailed
+  # 调试信息输出目录
+  output_dir: ""
+  # 是否启用调试报告生成
+  enable_report: false
