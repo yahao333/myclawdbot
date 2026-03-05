@@ -1,5 +1,7 @@
 // Package tenant 多租户支持包
-// 提供多租户隔离、用户管理、租户配置等功能
+//
+// 提供多租户隔离、用户管理、租户配置等功能。
+// 支持租户创建、用户管理、会话隔离和多租户中间件。
 package tenant
 
 import (
@@ -14,7 +16,9 @@ import (
 )
 
 // Tenant 租户
-// 代表一个独立的用户或组织，拥有独立的配置和资源
+//
+// 代表一个独立的用户或组织，拥有独立的配置和资源。
+// 每个租户可以独立管理自己的用户和会话。
 type Tenant struct {
 	ID          string            // 租户 ID
 	Name        string            // 租户名称
@@ -28,18 +32,20 @@ type Tenant struct {
 }
 
 // User 用户
-// 属于租户的用户的身份
+//
+// 属于租户的用户身份信息。
 type User struct {
-	ID        string   // 用户 ID
-	TenantID  string   // 租户 ID
-	Name      string   // 用户名
-	Email     string   // 邮箱
-	Role      string   // 角色: admin, member
-	CreatedAt time.Time
+	ID        string    // 用户 ID
+	TenantID  string    // 租户 ID
+	Name      string    // 用户名
+	Email     string    // 邮箱
+	Role      string    // 角色：admin（管理员）、member（成员）
+	CreatedAt time.Time // 创建时间
 }
 
 // Manager 租户管理器
-// 管理所有租户和全局配置
+//
+// 管理所有租户和全局配置。
 type Manager struct {
 	tenants    map[string]*Tenant  // tenantID -> Tenant
 	users      map[string]*User   // userID -> User (全局索引)
@@ -183,7 +189,8 @@ func (t *Tenant) GetSessionManager() *session.Manager {
 }
 
 // Middleware 多租户中间件
-// 用于从请求中提取租户信息
+//
+// 用于从请求中提取租户信息，并将其放入请求上下文中。
 type Middleware struct {
 	manager *Manager
 }
@@ -243,10 +250,11 @@ func GetUserIDFromContext(ctx context.Context) (string, bool) {
 }
 
 // TenantContext 租户上下文
-// 用于在请求处理中传递租户信息
+//
+// 用于在请求处理中传递租户信息。
 type TenantContext struct {
-	Tenant *Tenant
-	UserID string
+	Tenant *Tenant // 租户
+	UserID string   // 用户 ID
 }
 
 // NewTenantContext 创建租户上下文

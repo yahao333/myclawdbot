@@ -1,5 +1,6 @@
 // Package gateway 网关包
-// 提供 HTTP/WebSocket 网关服务，支持 REST API、实时通信和安全隔离执行
+//
+// 提供 HTTP/WebSocket 网关服务，支持 REST API、实时通信和安全隔离执行。
 package gateway
 
 import (
@@ -13,7 +14,9 @@ import (
 )
 
 // AuthMiddleware 认证中间件
-// 验证请求是否包含有效的 API Key
+//
+// 验证请求是否包含有效的 API Key。
+// 如果未启用认证，则直接跳过验证。
 func (s *Server) authMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// 如果未启用认证，直接跳过
@@ -45,6 +48,8 @@ func (s *Server) authMiddleware(next http.Handler) http.Handler {
 }
 
 // isValidAPIKey 验证 API Key 是否有效
+//
+// 使用 SHA256 哈希比较来安全地验证 API Key。
 func (s *Server) isValidAPIKey(apiKey string) bool {
 	hash := sha256.Sum256([]byte(apiKey))
 	hashedKey := hex.EncodeToString(hash[:])
@@ -58,7 +63,8 @@ func (s *Server) isValidAPIKey(apiKey string) bool {
 }
 
 // LoggingMiddleware 日志中间件
-// 记录每个请求的处理时间和状态
+//
+// 记录每个请求的处理时间和状态。
 func (s *Server) loggingMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		start := time.Now()
@@ -80,6 +86,8 @@ func (s *Server) loggingMiddleware(next http.Handler) http.Handler {
 }
 
 // responseWriter 包装 http.ResponseWriter 以捕获状态码
+//
+// 用于在日志中间件中记录 HTTP 响应状态码。
 type responseWriter struct {
 	http.ResponseWriter
 	statusCode int
@@ -92,7 +100,9 @@ func (rw *responseWriter) WriteHeader(code int) {
 }
 
 // CORSMiddleware CORS 中间件
-// 允许跨域请求（开发环境使用）
+//
+// 允许跨域请求（开发环境使用）。
+// 生产环境应限制允许的来源。
 func (s *Server) corsMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// 允许的来源（生产环境应限制）
@@ -114,7 +124,9 @@ func (s *Server) corsMiddleware(next http.Handler) http.Handler {
 }
 
 // RateLimitMiddleware 速率限制中间件
-// 简单的基于 IP 的速率限制
+//
+// 简单的基于 IP 的速率限制。
+// 注意：生产环境应使用 Redis 等分布式存储。
 func (s *Server) rateLimitMiddleware(next http.Handler) http.Handler {
 	// 简单的内存存储（生产环境应使用 Redis 等）
 	type clientInfo struct {
@@ -152,6 +164,8 @@ func (s *Server) rateLimitMiddleware(next http.Handler) http.Handler {
 }
 
 // getClientIP 获取客户端真实 IP
+//
+// 优先从 X-Forwarded-For 和 X-Real-IP 头获取真实 IP。
 func getClientIP(r *http.Request) string {
 	// 优先检查 X-Forwarded-For
 	xff := r.Header.Get("X-Forwarded-For")

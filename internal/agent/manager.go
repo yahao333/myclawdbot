@@ -1,5 +1,6 @@
 // Package agent 多 Agent 协作包
-// 提供 Agent 核心结构、协作机制和任务分发功能
+//
+// 提供 Agent 核心结构、协作机制和任务分发功能。
 package agent
 
 import (
@@ -14,7 +15,9 @@ import (
 )
 
 // Manager Agent 管理器
-// 负责创建、管理和调度多个 Agent
+//
+// 负责创建、管理和调度多个 Agent。
+// 支持 Agent 注册、组管理和任务分发。
 type Manager struct {
 	agents    map[string]*Agent      // agentID -> Agent
 	groups    map[string][]string    // groupID -> []agentID
@@ -26,6 +29,8 @@ type Manager struct {
 }
 
 // ManagerOption Manager 配置选项
+//
+// 用于在创建 Manager 时进行配置。
 type ManagerOption func(*Manager)
 
 // WithLLMClient 设置 LLM 客户端

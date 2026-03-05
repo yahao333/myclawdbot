@@ -1,5 +1,7 @@
 // Package gateway 网关包
-// 提供 HTTP/WebSocket 网关服务，支持 REST API、实时通信和安全隔离执行
+//
+// 提供 HTTP/WebSocket 网关服务，支持 REST API、实时通信和安全隔离执行。
+// 网关服务器作为系统的统一入口，处理客户端请求并转发到相应的后端服务。
 package gateway
 
 import (
@@ -25,30 +27,39 @@ import (
 )
 
 // Server 网关服务器
-// 负责启动 HTTP 服务器、处理 WebSocket 连接、管理会话和工具
+//
+// 负责启动 HTTP 服务器、处理 WebSocket 连接、管理会话和工具。
+// 支持 REST API、实时通信和沙盒模式的安全隔离执行。
 type Server struct {
-	httpServer *http.Server
-	config     *config.Config
-	llmClient  llm.Client
-	registry   *tools.Registry
-	sessions   *session.Manager
-	wsUpgrader websocket.Upgrader
-	wsClients  map[string]*wsClient
-	mu         sync.RWMutex
+	httpServer *http.Server // HTTP 服务器实例
+	config     *config.Config // 应用程序配置
+	llmClient  llm.Client // LLM 客户端
+	registry   *tools.Registry // 工具注册表
+	sessions   *session.Manager // 会话管理器
+	wsUpgrader websocket.Upgrader // WebSocket 升级器
+	wsClients  map[string]*wsClient // WebSocket 客户端映射
+	mu         sync.RWMutex // 互斥锁，保护并发访问
 }
 
 // wsClient WebSocket 客户端
+//
+// 表示一个连接的 WebSocket 客户端。
 type wsClient struct {
-	id       string
-	conn     *websocket.Conn
-	sendChan chan []byte
-	server   *Server
+	id       string // 客户端唯一标识
+	conn     *websocket.Conn // WebSocket 连接
+	sendChan chan []byte // 发送消息通道
+	server   *Server // 关联的服务器
 }
 
 // NewServer 创建新的网关服务器
-// cfg: 应用程序配置
-// client: LLM 客户端
-// 返回配置好的服务器实例
+//
+// 使用给定的配置和 LLM 客户端创建网关服务器实例。
+// 参数：
+//   - cfg: 应用程序配置
+//   - client: LLM 客户端
+//
+// 返回：
+//   - *Server: 配置好的服务器实例
 func NewServer(cfg *config.Config, client llm.Client) *Server {
 	// 创建工具注册表
 	registry := tools.NewRegistry()
@@ -79,7 +90,8 @@ func NewServer(cfg *config.Config, client llm.Client) *Server {
 }
 
 // createSandboxRegistry 创建沙盒模式的工具注册表
-// 限制文件访问和命令执行
+//
+// 在沙盒模式下，限制文件访问和命令执行以确保安全。
 func createSandboxRegistry(cfg *config.Config) *tools.Registry {
 	registry := tools.NewRegistry()
 
@@ -99,6 +111,8 @@ func createSandboxRegistry(cfg *config.Config) *tools.Registry {
 }
 
 // registerTools 注册所有可用工具
+//
+// 在正常模式下注册所有工具，包括文件工具、命令执行工具和 Web 工具。
 func registerTools(registry *tools.Registry, cfg *config.Config) {
 	// 文件工具
 	readTool := file.NewReadToolWithConfig(&cfg.Tools)
@@ -116,6 +130,11 @@ func registerTools(registry *tools.Registry, cfg *config.Config) {
 }
 
 // Start 启动网关服务器（非阻塞）
+//
+// 启动 HTTP 服务器并开始处理请求。服务器在后台运行，不阻塞调用者。
+//
+// 返回：
+//   - error: 启动失败时返回错误
 func (s *Server) Start() error {
 	addr := fmt.Sprintf("%s:%d", s.config.Gateway.Host, s.config.Gateway.Port)
 
@@ -158,6 +177,14 @@ func (s *Server) Start() error {
 }
 
 // StartWithContext 启动网关服务器（支持 context 取消）
+//
+// 启动 HTTP 服务器并监听上下文取消信号。当上下文取消时，服务器会优雅关闭。
+//
+// 参数：
+//   - ctx: 上下文，用于控制服务器生命周期
+//
+// 返回：
+//   - error: 启动失败时返回错误
 func (s *Server) StartWithContext(ctx context.Context) error {
 	addr := fmt.Sprintf("%s:%d", s.config.Gateway.Host, s.config.Gateway.Port)
 
@@ -207,6 +234,11 @@ func (s *Server) StartWithContext(ctx context.Context) error {
 }
 
 // Stop 停止网关服务器
+//
+// 优雅地停止服务器，等待现有请求处理完成。
+//
+// 返回：
+//   - error: 停止失败时返回错误
 func (s *Server) Stop() error {
 	if s.httpServer != nil {
 		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)

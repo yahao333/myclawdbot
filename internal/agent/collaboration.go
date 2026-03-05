@@ -1,5 +1,6 @@
 // Package agent 多 Agent 协作包
-// 提供 Agent 核心结构、协作机制和任务分发功能
+//
+// 提供 Agent 核心结构、协作机制和任务分发功能。
 package agent
 
 import (
@@ -10,6 +11,8 @@ import (
 )
 
 // Message 协作消息
+//
+// 用于 Agent 之间传递的消息结构。
 type Message struct {
 	ID         string                 // 消息 ID
 	FromAgent  string                 // 发送者 Agent ID
@@ -22,6 +25,8 @@ type Message struct {
 }
 
 // MessageType 消息类型
+//
+// 定义 Agent 之间消息的类型。
 type MessageType string
 
 const (
@@ -35,7 +40,9 @@ const (
 )
 
 // Collaboration 协作管理器
-// 负责 Agent 之间的消息传递和任务协调
+//
+// 负责 Agent 之间的消息传递和任务协调。
+// 支持消息订阅、发送、接收和广播。
 type Collaboration struct {
 	manager    *Manager
 	inbox      map[string]chan *Message // agentID -> inbox
@@ -203,6 +210,8 @@ func (c *Collaboration) ClearHistory() {
 }
 
 // CollaborationWorkflow 协作工作流
+//
+// 用于定义和管理复杂的多 Agent 协作流程。
 type CollaborationWorkflow struct {
 	collaboration *Collaboration
 	manager       *Manager
@@ -211,15 +220,19 @@ type CollaborationWorkflow struct {
 }
 
 // Workflow 工作流定义
+//
+// 定义一个完整的协作工作流，包含多个步骤。
 type Workflow struct {
-	ID          string
-	Name        string
-	Description string
-	Steps       []WorkflowStep
-	CreatedAt   time.Time
+	ID          string // 工作流 ID
+	Name        string // 工作流名称
+	Description string // 工作流描述
+	Steps       []WorkflowStep // 工作流步骤
+	CreatedAt   time.Time // 创建时间
 }
 
 // WorkflowStep 工作流步骤
+//
+// 定义工作流中的单个步骤。
 type WorkflowStep struct {
 	AgentID    string       // 执行的 Agent
 	Action     string       // 动作类型: execute, delegate, aggregate

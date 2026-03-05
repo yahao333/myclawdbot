@@ -1,5 +1,8 @@
 // Package agent 多 Agent 协作包
-// 提供 Agent 核心结构、协作机制和任务分发功能
+//
+// 提供 Agent 核心结构、协作机制和任务分发功能。
+// 支持创建多种类型的 Agent（通用、研究、编码、规划、执行），
+// 并提供 Agent 之间的消息传递和协作工作流。
 package agent
 
 import (
@@ -15,40 +18,48 @@ import (
 )
 
 // AgentType Agent 类型
+//
+// 定义 Agent 的专业类型，用于任务分发和能力识别。
 type AgentType string
 
 const (
-	AgentTypeGeneral  AgentType = "general"  // 通用 Agent
-	AgentTypeResearch AgentType = "research" // 研究型 Agent
-	AgentTypeCoder   AgentType = "coder"    // 编码 Agent
-	AgentTypePlanner AgentType = "planner"  // 规划 Agent
-	AgentTypeExecutor AgentType = "executor" // 执行 Agent
+	AgentTypeGeneral  AgentType = "general"  // 通用 Agent：处理一般性任务
+	AgentTypeResearch AgentType = "research" // 研究型 Agent：擅长信息分析和数据收集
+	AgentTypeCoder   AgentType = "coder"    // 编码 Agent：专门处理编程任务
+	AgentTypePlanner AgentType = "planner"  // 规划 Agent：擅长任务分解和计划制定
+	AgentTypeExecutor AgentType = "executor" // 执行 Agent：擅长执行具体操作
 )
 
 // AgentStatus Agent 状态
+//
+// 表示 Agent 的当前运行状态。
 type AgentStatus string
 
 const (
-	AgentStatusIdle    AgentStatus = "idle"    // 空闲
-	AgentStatusBusy    AgentStatus = "busy"    // 工作中
-	AgentStatusWaiting AgentStatus = "waiting" // 等待中
-	AgentStatusError   AgentStatus = "error"   // 错误
+	AgentStatusIdle    AgentStatus = "idle"    // 空闲：可以接受新任务
+	AgentStatusBusy    AgentStatus = "busy"    // 工作中：正在处理任务
+	AgentStatusWaiting AgentStatus = "waiting" // 等待中：等待外部资源
+	AgentStatusError   AgentStatus = "error"   // 错误：发生错误需要处理
 )
 
 // AgentConfig Agent 配置
+//
+// 用于创建 Agent 的配置信息。
 type AgentConfig struct {
 	Type         AgentType     // Agent 类型
 	Name         string        // Agent 名称
 	Description  string        // Agent 描述
-	Model        string        // 使用的模型
-	Tools        []tools.Tool  // 可用工具
+	Model        string        // 使用的 LLM 模型
+	Tools        []tools.Tool  // 可用工具列表
 	MaxRetries   int           // 最大重试次数
 	Timeout      time.Duration // 超时时间
 	SystemPrompt string        // 系统提示词
 }
 
 // Agent 代表一个智能 Agent
-// 具有独立的任务处理能力和工具使用权限
+//
+// 具有独立的任务处理能力和工具使用权限。
+// 每个 Agent 都可以独立执行任务或与其他 Agent 协作。
 type Agent struct {
 	ID          string              // Agent ID
 	Config      AgentConfig         // Agent 配置
@@ -63,6 +74,17 @@ type Agent struct {
 }
 
 // NewAgent 创建新 Agent
+//
+// 使用给定的配置创建新的 Agent 实例。
+//
+// 参数：
+//   - id: Agent 唯一标识
+//   - cfg: Agent 配置
+//   - llmClient: LLM 客户端
+//   - sessMgr: 会话管理器
+//
+// 返回：
+//   - *Agent: 创建的 Agent 实例
 func NewAgent(id string, cfg AgentConfig, llmClient llm.Client, sessMgr *session.Manager) *Agent {
 	// 构建工具映射
 	toolMap := make(map[string]tools.Tool)
@@ -126,6 +148,16 @@ func getCapabilities(agentType AgentType) []string {
 }
 
 // Execute 执行任务
+//
+// 使用 LLM 执行给定的任务。
+//
+// 参数：
+//   - ctx: 上下文
+//   - task: 任务描述
+//
+// 返回：
+//   - string: 任务执行结果
+//   - error: 执行失败时返回错误
 func (a *Agent) Execute(ctx context.Context, task string) (string, error) {
 	a.mu.Lock()
 	a.Status = AgentStatusBusy
@@ -155,6 +187,18 @@ func (a *Agent) Execute(ctx context.Context, task string) (string, error) {
 }
 
 // ExecuteWithTools 使用工具执行任务
+//
+// 使用指定的工具执行任务。如果 LLM 返回工具调用请求，
+// 会自动执行相应的工具并返回结果。
+//
+// 参数：
+//   - ctx: 上下文
+//   - task: 任务描述
+//   - toolNames: 允许使用的工具名称列表
+//
+// 返回：
+//   - string: 任务执行结果
+//   - error: 执行失败时返回错误
 func (a *Agent) ExecuteWithTools(ctx context.Context, task string, toolNames []string) (string, error) {
 	a.mu.Lock()
 	a.Status = AgentStatusBusy
@@ -273,14 +317,16 @@ func (a *Agent) GetInfo() AgentInfo {
 }
 
 // AgentInfo Agent 信息
+//
+// 包含 Agent 的详细信息，用于展示和调试。
 type AgentInfo struct {
-	ID           string        `json:"id"`
-	Name         string        `json:"name"`
-	Type         AgentType     `json:"type"`
-	Description  string        `json:"description"`
-	Status       AgentStatus   `json:"status"`
-	Capabilities []string      `json:"capabilities"`
-	ToolCount    int           `json:"tool_count"`
-	CreatedAt    time.Time     `json:"created_at"`
-	UpdatedAt    time.Time     `json:"updated_at"`
+	ID           string        `json:"id"`           // Agent ID
+	Name         string        `json:"name"`         // Agent 名称
+	Type         AgentType     `json:"type"`        // Agent 类型
+	Description  string        `json:"description"`  // Agent 描述
+	Status       AgentStatus   `json:"status"`       // Agent 状态
+	Capabilities []string      `json:"capabilities"` // 能力列表
+	ToolCount    int           `json:"tool_count"`   // 工具数量
+	CreatedAt    time.Time     `json:"created_at"`   // 创建时间
+	UpdatedAt    time.Time     `json:"updated_at"`   // 更新时间
 }

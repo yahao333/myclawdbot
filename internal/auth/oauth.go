@@ -1,5 +1,7 @@
 // Package auth 认证授权包
-// 提供 OAuth 2.0 认证支持，包括多种登录方式
+//
+// 提供 OAuth 2.0 认证支持，包括多种登录方式（GitHub、Google）。
+// 支持用户会话管理、API 密钥验证和用户信息获取。
 package auth
 
 import (
@@ -20,38 +22,72 @@ import (
 )
 
 // OAuthProvider OAuth 提供商接口
+//
+// 定义 OAuth 2.0 认证提供商的统一接口。
 type OAuthProvider interface {
 	// Name 返回提供商名称
 	Name() string
+
 	// GetAuthURL 获取授权 URL
+	//
+	// 返回用于用户授权的 URL。
+	// 参数：
+	//   - state: 防止 CSRF 攻击的状态码
+	//
+	// 返回：
+	//   - string: 授权页面 URL
 	GetAuthURL(state string) string
+
 	// ExchangeCode 交换授权码获取 token
+	//
+	// 将用户授权后获得的授权码交换为访问令牌。
+	// 参数：
+	//   - code: 授权码
+	//
+	// 返回：
+	//   - *Token: 访问令牌
+	//   - error: 交换失败时返回错误
 	ExchangeCode(code string) (*Token, error)
+
 	// GetUserInfo 获取用户信息
+	//
+	// 使用访问令牌获取用户信息。
+	// 参数：
+	//   - token: 访问令牌
+	//
+	// 返回：
+	//   - *UserInfo: 用户信息
+	//   - error: 获取失败时返回错误
 	GetUserInfo(token string) (*UserInfo, error)
 }
 
 // Token OAuth 令牌
+//
+// 包含 OAuth 2.0 访问令牌和刷新令牌信息。
 type Token struct {
-	AccessToken  string    `json:"access_token"`
-	RefreshToken string    `json:"refresh_token"`
-	ExpiresAt    time.Time `json:"expires_at"`
-	TokenType    string    `json:"token_type"`
-	Raw          map[string]interface{}
+	AccessToken  string    `json:"access_token"`  // 访问令牌
+	RefreshToken string    `json:"refresh_token"` // 刷新令牌
+	ExpiresAt    time.Time `json:"expires_at"`    // 过期时间
+	TokenType    string    `json:"token_type"`    // 令牌类型（通常是 Bearer）
+	Raw          map[string]interface{} // 原始响应数据
 }
 
 // UserInfo 用户信息
+//
+// 从 OAuth 提供商获取的用户基本信息。
 type UserInfo struct {
-	ID        string `json:"id"`
-	Email     string `json:"email"`
-	Name      string `json:"name"`
-	AvatarURL string `json:"avatar_url"`
-	Provider  string `json:"provider"`
+	ID        string `json:"id"`         // 用户唯一标识
+	Email     string `json:"email"`     // 用户邮箱
+	Name      string `json:"name"`      // 用户名称
+	AvatarURL string `json:"avatar_url"` // 头像 URL
+	Provider  string `json:"provider"`  // OAuth 提供商
 }
 
 // Manager 认证管理器
+//
+// 管理 OAuth 提供商、用户会话和用户信息。
 type Manager struct {
-	providers   map[string]OAuthProvider
+	providers   map[string]OAuthProvider // OAuth 提供商映射
 	users      map[string]*UserInfo    // userID -> UserInfo
 	sessions   map[string]*UserSession   // sessionID -> session
 	mu         sync.RWMutex
@@ -59,15 +95,25 @@ type Manager struct {
 }
 
 // UserSession 用户会话
+//
+// 表示一个已认证用户的会话信息。
 type UserSession struct {
-	UserID    string
-	SessionID string
-	Token     *Token
-	CreatedAt time.Time
-	ExpiresAt time.Time
+	UserID    string    // 用户 ID
+	SessionID string    // 会话 ID
+	Token     *Token   // OAuth 令牌
+	CreatedAt time.Time // 创建时间
+	ExpiresAt time.Time // 过期时间
 }
 
 // NewManager 创建认证管理器
+//
+// 使用给定的配置创建认证管理器，并自动注册配置的 OAuth 提供商。
+//
+// 参数：
+//   - cfg: 认证配置
+//
+// 返回：
+//   - *Manager: 创建的认证管理器
 func NewManager(cfg *config.AuthConfig) *Manager {
 	m := &Manager{
 		providers: make(map[string]OAuthProvider),
@@ -108,6 +154,8 @@ func (m *Manager) ListProviders() []string {
 }
 
 // GenerateState 生成随机 state
+//
+// 生成用于防止 CSRF 攻击的随机状态码。
 func (m *Manager) GenerateState() (string, error) {
 	b := make([]byte, 32)
 	if _, err := rand.Read(b); err != nil {
@@ -175,10 +223,12 @@ func (m *Manager) GetUser(userID string) (*UserInfo, bool) {
 }
 
 // GitHubProvider GitHub OAuth 提供商
+//
+// 实现 OAuthProvider 接口，提供 GitHub OAuth 2.0 认证支持。
 type GitHubProvider struct {
-	clientID     string
-	clientSecret string
-	redirectURL  string
+	clientID     string // GitHub 应用客户端 ID
+	clientSecret string // GitHub 应用客户端密钥
+	redirectURL  string // 授权回调 URL
 }
 
 // NewGitHubProvider 创建 GitHub OAuth 提供商
@@ -311,10 +361,12 @@ func (p *GitHubProvider) getPrimaryEmail(accessToken string) (string, error) {
 }
 
 // GoogleProvider Google OAuth 提供商
+//
+// 实现 OAuthProvider 接口，提供 Google OAuth 2.0 认证支持。
 type GoogleProvider struct {
-	clientID     string
-	clientSecret string
-	redirectURL  string
+	clientID     string // Google 应用客户端 ID
+	clientSecret string // Google 应用客户端密钥
+	redirectURL  string // 授权回调 URL
 }
 
 // NewGoogleProvider 创建 Google OAuth 提供商
@@ -421,6 +473,8 @@ func (p *GoogleProvider) GetUserInfo(accessToken string) (*UserInfo, error) {
 }
 
 // LoadFromFile 从文件加载用户数据
+//
+// 从 JSON 文件加载用户信息到管理器中。
 func (m *Manager) LoadFromFile(path string) error {
 	data, err := os.ReadFile(path)
 	if err != nil {
@@ -440,6 +494,8 @@ func (m *Manager) LoadFromFile(path string) error {
 }
 
 // SaveToFile 保存用户数据到文件
+//
+// 将用户信息保存到 JSON 文件中。
 func (m *Manager) SaveToFile(path string) error {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
@@ -453,6 +509,8 @@ func (m *Manager) SaveToFile(path string) error {
 }
 
 // Middleware 返回认证中间件
+//
+// 返回一个 HTTP 中间件，用于验证请求的会话有效性。
 func (m *Manager) Middleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// 从 Cookie 或 Header 获取 session
