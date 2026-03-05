@@ -21,6 +21,7 @@ type Config struct {
 	Memory  MemoryConfig  `yaml:"memory"`  // 记忆配置（短期/长期记忆、向量嵌入等）
 	Gateway GatewayConfig `yaml:"gateway"` // 网关配置（主机、端口）
 	Channel ChannelConfig `yaml:"channel"` // 渠道配置（终端、Telegram 等）
+	Auth    AuthConfig    `yaml:"auth"`    // 认证配置（OAuth 等）
 }
 
 // LLMConfig 大语言模型配置
@@ -100,6 +101,28 @@ type GatewayConfig struct {
 	APIKeys       []string `yaml:"api_keys"`       // 允许的 API Key SHA256 哈希值列表
 	EnableSandbox bool     `yaml:"enable_sandbox"` // 是否启用沙盒模式（限制文件访问和命令执行）
 	SandboxDirs   []string `yaml:"sandbox_dirs"`   // 沙盒允许访问的目录列表
+}
+
+// AuthConfig 认证配置
+// OAuth 认证配置
+type AuthConfig struct {
+	Enable   bool           `yaml:"enable"`    // 是否启用 OAuth 认证
+	GitHub   GitHubAuthConfig `yaml:"github"`  // GitHub OAuth 配置
+	Google   GoogleAuthConfig `yaml:"google"`  // Google OAuth 配置
+}
+
+// GitHubAuthConfig GitHub OAuth 配置
+type GitHubAuthConfig struct {
+	ClientID     string `yaml:"client_id"`      // GitHub OAuth App Client ID
+	ClientSecret string `yaml:"client_secret"`  // GitHub OAuth App Client Secret
+	RedirectURL  string `yaml:"redirect_url"`    // 回调 URL
+}
+
+// GoogleAuthConfig Google OAuth 配置
+type GoogleAuthConfig struct {
+	ClientID     string `yaml:"client_id"`      // Google OAuth Client ID
+	ClientSecret string `yaml:"client_secret"`  // Google OAuth Client Secret
+	RedirectURL  string `yaml:"redirect_url"`   // 回调 URL
 }
 
 // Load 从 YAML 文件加载配置
@@ -187,6 +210,19 @@ func LoadFromEnv() *Config {
 			Slack: SlackConfig{
 				BotToken:     getEnv("SLACK_BOT_TOKEN", ""),
 				SigninSecret: getEnv("SLACK_SIGNING_SECRET", ""),
+			},
+		},
+		Auth: AuthConfig{
+			Enable: getEnv("AUTH_ENABLE", "false") == "true",
+			GitHub: GitHubAuthConfig{
+				ClientID:     getEnv("GITHUB_CLIENT_ID", ""),
+				ClientSecret: getEnv("GITHUB_CLIENT_SECRET", ""),
+				RedirectURL:  getEnv("GITHUB_REDIRECT_URL", ""),
+			},
+			Google: GoogleAuthConfig{
+				ClientID:     getEnv("GOOGLE_CLIENT_ID", ""),
+				ClientSecret: getEnv("GOOGLE_CLIENT_SECRET", ""),
+				RedirectURL:  getEnv("GOOGLE_REDIRECT_URL", ""),
 			},
 		},
 	}
