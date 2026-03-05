@@ -36,9 +36,10 @@ type LLMConfig struct {
 // ChannelConfig 渠道配置
 // 定义与用户交互的渠道类型
 type ChannelConfig struct {
-	Type      string          `yaml:"type"`      // 渠道类型：terminal, telegram, discord
-	Telegram  TelegramConfig  `yaml:"telegram"`  // Telegram 配置
-	Discord   DiscordConfig   `yaml:"discord"`   // Discord 配置
+	Type     string        `yaml:"type"`     // 渠道类型：terminal, telegram, discord, slack
+	Telegram TelegramConfig `yaml:"telegram"` // Telegram 配置
+	Discord  DiscordConfig  `yaml:"discord"`  // Discord 配置
+	Slack    SlackConfig    `yaml:"slack"`    // Slack 配置
 }
 
 // TelegramConfig Telegram 电报机器人配置
@@ -49,6 +50,12 @@ type TelegramConfig struct {
 // DiscordConfig Discord 配置
 type DiscordConfig struct {
 	BotToken string `yaml:"bot_token"` // Discord Bot 令牌
+}
+
+// SlackConfig Slack 配置
+type SlackConfig struct {
+	BotToken       string `yaml:"bot_token"`        // Slack Bot User OAuth Token
+	SigninSecret   string `yaml:"signin_secret"`    // Signing Secret
 }
 
 // ToolsConfig 工具配置
@@ -176,6 +183,10 @@ func LoadFromEnv() *Config {
 			},
 			Discord: DiscordConfig{
 				BotToken: getEnv("DISCORD_BOT_TOKEN", ""),
+			},
+			Slack: SlackConfig{
+				BotToken:     getEnv("SLACK_BOT_TOKEN", ""),
+				SigninSecret: getEnv("SLACK_SIGNING_SECRET", ""),
 			},
 		},
 	}
