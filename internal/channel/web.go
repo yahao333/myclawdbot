@@ -7,13 +7,13 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"log"
 	"net/http"
 	"sync"
 	"time"
 
 	"github.com/gorilla/websocket"
 	"github.com/yahao333/myclawdbot/internal/llm"
+	"github.com/yahao333/myclawdbot/internal/logger"
 	"github.com/yahao333/myclawdbot/internal/session"
 )
 
@@ -155,9 +155,14 @@ func (h *WebHandler) Start(ctx context.Context) error {
 
 	// 启动服务器（非阻塞）
 	go func() {
-		log.Printf("[Web] 服务器启动于 http://%s:%d", h.config.Host, h.config.Port)
+		logger.Default().Info("Web server starting",
+		logger.String("host", h.config.Host),
+		logger.Int("port", h.config.Port),
+	)
 		if err := h.httpServer.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			log.Printf("[Web] 服务器错误: %v", err)
+			logger.Default().Error("Web server error",
+			logger.Err(err),
+		)
 		}
 	}()
 
@@ -186,7 +191,7 @@ func (h *WebHandler) Stop() {
 	}
 	h.clientsMu.Unlock()
 
-	log.Println("[Web] 服务器已停止")
+	logger.Default().Info("Web server stopped")
 }
 
 const indexHTML = `<!DOCTYPE html>
@@ -494,7 +499,9 @@ func (h *WebHandler) handleListTools(w http.ResponseWriter, r *http.Request) {
 func (h *WebHandler) handleWebSocket(w http.ResponseWriter, r *http.Request) {
 	conn, err := h.upgrader.Upgrade(w, r, nil)
 	if err != nil {
-		log.Printf("[Web] WebSocket upgrade failed: %v", err)
+		logger.Default().Error("WebSocket upgrade failed",
+			logger.Err(err),
+		)
 		return
 	}
 
@@ -541,7 +548,9 @@ func (h *WebHandler) readPump(client *WebClient) {
 		if err != nil {
 			// 检查是否是意外的连接关闭
 			if websocket.IsUnexpectedCloseError(err, websocket.CloseGoingAway, websocket.CloseAbnormalClosure) {
-				log.Printf("[Web] WebSocket error: %v", err)
+				logger.Default().Error("WebSocket error",
+					logger.Err(err),
+				)
 			}
 			break
 		}
@@ -651,7 +660,7 @@ func (h *WebHandler) sendToClient(client *WebClient, data interface{}) {
 	select {
 	case client.send <- msg:
 	default:
-		log.Printf("[Web] client send queue full")
+		logger.Default().Warn("Client send queue full")
 	}
 }
 

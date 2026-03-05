@@ -8,7 +8,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"log"
 	"net"
 	"net/http"
 	"os"
@@ -17,6 +16,7 @@ import (
 
 	"github.com/yahao333/myclawdbot/internal/config"
 	"github.com/yahao333/myclawdbot/internal/llm"
+	"github.com/yahao333/myclawdbot/internal/logger"
 	"github.com/yahao333/myclawdbot/internal/session"
 	"github.com/yahao333/myclawdbot/internal/tools"
 	"github.com/yahao333/myclawdbot/internal/tools/exec"
@@ -154,13 +154,11 @@ func (s *Server) Start() error {
 	}
 
 	// 启动服务器（非阻塞）
-	log.Printf("Gateway server starting on %s", addr)
-	if s.config.Gateway.EnableAuth {
-		log.Printf("Authentication enabled")
-	}
-	if s.config.Gateway.EnableSandbox {
-		log.Printf("Sandbox mode enabled with dirs: %v", s.config.Gateway.SandboxDirs)
-	}
+	logger.Default().Info("Gateway server starting",
+		logger.String("addr", addr),
+		logger.Bool("auth_enabled", s.config.Gateway.EnableAuth),
+		logger.Bool("sandbox_enabled", s.config.Gateway.EnableSandbox),
+	)
 
 	listener, err := net.Listen("tcp", addr)
 	if err != nil {
@@ -169,7 +167,9 @@ func (s *Server) Start() error {
 
 	go func() {
 		if serveErr := s.httpServer.Serve(listener); serveErr != nil && serveErr != http.ErrServerClosed {
-			log.Printf("Gateway server error: %v", serveErr)
+			logger.Default().Error("Gateway server error",
+				logger.Err(serveErr),
+			)
 		}
 	}()
 
@@ -205,15 +205,21 @@ func (s *Server) StartWithContext(ctx context.Context) error {
 
 	// 启动服务器（非阻塞）
 	go func() {
-		log.Printf("Gateway server starting on %s", addr)
+		logger.Default().Info("Gateway server starting",
+			logger.String("addr", addr),
+		)
 		if s.config.Gateway.EnableAuth {
-			log.Printf("Authentication enabled")
+			logger.Default().Info("Authentication enabled")
 		}
 		if s.config.Gateway.EnableSandbox {
-			log.Printf("Sandbox mode enabled with dirs: %v", s.config.Gateway.SandboxDirs)
+			logger.Default().Info("Sandbox mode enabled",
+				logger.Any("dirs", s.config.Gateway.SandboxDirs),
+			)
 		}
 		if err := s.httpServer.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			log.Printf("Gateway server error: %v", err)
+			logger.Default().Error("Gateway server error",
+				logger.Err(err),
+			)
 		}
 	}()
 
@@ -224,12 +230,12 @@ func (s *Server) StartWithContext(ctx context.Context) error {
 	shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	log.Println("Gateway server shutting down...")
+	logger.Default().Info("Gateway server shutting down...")
 	if err := s.httpServer.Shutdown(shutdownCtx); err != nil {
 		return fmt.Errorf("server forced to shutdown: %w", err)
 	}
 
-	log.Println("Server exited")
+	logger.Default().Info("Server exited")
 	return nil
 }
 
@@ -367,7 +373,9 @@ func (s *Server) handleWebSocket(w http.ResponseWriter, r *http.Request) {
 	// 升级连接
 	conn, err := s.wsUpgrader.Upgrade(w, r, nil)
 	if err != nil {
-		log.Printf("WebSocket upgrade error: %v", err)
+		logger.Default().Error("WebSocket upgrade error",
+			logger.Err(err),
+		)
 		return
 	}
 
@@ -420,7 +428,9 @@ func (c *wsClient) readPump() {
 		_, message, err := c.conn.ReadMessage()
 		if err != nil {
 			if websocket.IsUnexpectedCloseError(err, websocket.CloseGoingAway, websocket.CloseAbnormalClosure) {
-				log.Printf("WebSocket error: %v", err)
+				logger.Default().Error("WebSocket error",
+					logger.Err(err),
+				)
 			}
 			break
 		}
@@ -509,7 +519,9 @@ func (c *wsClient) send(v interface{}) {
 	select {
 	case c.sendChan <- data:
 	default:
-		log.Printf("Client %s send channel full", c.id)
+		logger.Default().Warn("Client send channel full",
+			logger.String("client_id", c.id),
+		)
 	}
 }
 

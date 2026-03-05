@@ -5,11 +5,11 @@ package channel
 import (
 	"context"
 	"fmt"
-	"log"
 	"strings"
 
 	"github.com/slack-go/slack"
 	"github.com/yahao333/myclawdbot/internal/llm"
+	"github.com/yahao333/myclawdbot/internal/logger"
 	"github.com/yahao333/myclawdbot/internal/session"
 )
 
@@ -65,11 +65,14 @@ func (s *SlackChannel) Start(ctx context.Context) error {
 		return fmt.Errorf("slack auth test failed: %w", err)
 	}
 
-	log.Printf("Slack bot started: @%s in %s", authTest.User, authTest.Team)
+	logger.Default().Info("Slack bot started",
+		logger.String("user", authTest.User),
+		logger.String("team", authTest.Team),
+	)
 
 	// 保持运行
 	<-ctx.Done()
-	log.Println("Slack channel stopped")
+	logger.Default().Info("Slack channel stopped")
 	return nil
 }
 
@@ -115,7 +118,9 @@ func (s *SlackChannel) handleMessage(event *slack.MessageEvent) error {
 	// 发送消息到 LLM
 	response, err := ctx.session.SendMessage(context.Background(), s.llmClient, text)
 	if err != nil {
-		log.Printf("Failed to send message: %v", err)
+		logger.Default().Error("Failed to send message",
+			logger.Err(err),
+		)
 		s.sendMessage(event.Channel, "抱歉，处理您的消息时发生错误。")
 		return err
 	}
@@ -207,7 +212,9 @@ func (s *SlackChannel) sendMessage(channelID, text string) {
 		slack.MsgOptionText(text, false),
 	)
 	if err != nil {
-		log.Printf("Failed to send message: %v", err)
+		logger.Default().Error("Failed to send message",
+			logger.Err(err),
+		)
 	}
 }
 

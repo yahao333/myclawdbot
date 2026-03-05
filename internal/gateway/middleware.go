@@ -7,10 +7,11 @@ import (
 	"crypto/sha256"
 	"crypto/subtle"
 	"encoding/hex"
-	"log"
 	"net/http"
 	"strings"
 	"time"
+
+	"github.com/yahao333/myclawdbot/internal/logger"
 )
 
 // AuthMiddleware 认证中间件
@@ -75,12 +76,11 @@ func (s *Server) loggingMiddleware(next http.Handler) http.Handler {
 		next.ServeHTTP(wrapped, r)
 
 		duration := time.Since(start)
-		log.Printf(
-			"%s %s %d %v",
-			r.Method,
-			r.URL.Path,
-			wrapped.statusCode,
-			duration,
+		logger.Default().Info("HTTP request",
+			logger.String("method", r.Method),
+			logger.String("path", r.URL.Path),
+			logger.Int("status", wrapped.statusCode),
+			logger.String("duration", duration.String()),
 		)
 	})
 }

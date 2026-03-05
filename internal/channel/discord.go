@@ -5,12 +5,12 @@ package channel
 import (
 	"context"
 	"fmt"
-	"log"
 	"strings"
 	"time"
 
 	"github.com/bwmarrin/discordgo"
 	"github.com/yahao333/myclawdbot/internal/llm"
+	"github.com/yahao333/myclawdbot/internal/logger"
 	"github.com/yahao333/myclawdbot/internal/session"
 )
 
@@ -65,14 +65,14 @@ func (d *DiscordChannel) Start(ctx context.Context) error {
 		return fmt.Errorf("failed to open Discord session: %w", err)
 	}
 
-	log.Println("Discord channel started")
+	logger.Default().Info("Discord channel started")
 
 	// 等待上下文取消
 	<-ctx.Done()
 
 	// 关闭连接
 	d.session.Close()
-	log.Println("Discord channel stopped")
+	logger.Default().Info("Discord channel stopped")
 
 	return nil
 }
@@ -90,7 +90,9 @@ func (d *DiscordChannel) handleMessage(s *discordgo.Session, m *discordgo.Messag
 	// 发送消息到 LLM
 	response, err := ctx.session.SendMessage(context.Background(), d.llmClient, m.Content)
 	if err != nil {
-		log.Printf("Failed to send message: %v", err)
+		logger.Default().Error("Failed to send message",
+			logger.Err(err),
+		)
 		d.sendMessage(m.ChannelID, "抱歉，处理您的消息时发生错误。")
 		return
 	}
