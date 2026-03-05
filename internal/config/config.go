@@ -36,13 +36,19 @@ type LLMConfig struct {
 // ChannelConfig 渠道配置
 // 定义与用户交互的渠道类型
 type ChannelConfig struct {
-	Type     string         `yaml:"type"`     // 渠道类型：terminal, telegram
-	Telegram TelegramConfig `yaml:"telegram"` // Telegram 配置
+	Type      string          `yaml:"type"`      // 渠道类型：terminal, telegram, discord
+	Telegram  TelegramConfig  `yaml:"telegram"`  // Telegram 配置
+	Discord   DiscordConfig   `yaml:"discord"`   // Discord 配置
 }
 
 // TelegramConfig Telegram 电报机器人配置
 type TelegramConfig struct {
 	BotToken string `yaml:"bot_token"` // Telegram Bot 令牌
+}
+
+// DiscordConfig Discord 配置
+type DiscordConfig struct {
+	BotToken string `yaml:"bot_token"` // Discord Bot 令牌
 }
 
 // ToolsConfig 工具配置
@@ -167,6 +173,9 @@ func LoadFromEnv() *Config {
 			Type: getEnv("CHANNEL_TYPE", "terminal"),
 			Telegram: TelegramConfig{
 				BotToken: getEnv("TELEGRAM_BOT_TOKEN", ""),
+			},
+			Discord: DiscordConfig{
+				BotToken: getEnv("DISCORD_BOT_TOKEN", ""),
 			},
 		},
 	}
